@@ -23,6 +23,15 @@ export const databaseMigrations: DatabaseMigration[] = [{
     `CREATE TABLE IF NOT EXISTS manual_crm_updates (id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id), desired_status TEXT NOT NULL, description TEXT, status TEXT NOT NULL, created_at INTEGER NOT NULL, confirmed_at INTEGER, superseded_at INTEGER)`,
     `CREATE INDEX IF NOT EXISTS manual_crm_updates_task_status_idx ON manual_crm_updates(task_id, status)`
   ]
+}, {
+  version: 3,
+  name: "multi_project_registry",
+  statements: [
+    `CREATE TABLE IF NOT EXISTS projects (id TEXT PRIMARY KEY, name TEXT NOT NULL, repository_root TEXT NOT NULL, default_branch TEXT NOT NULL, completion_policy TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS projects_repository_root_unique ON projects(repository_root)`,
+    `CREATE TABLE IF NOT EXISTS project_events (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id), type TEXT NOT NULL, data TEXT NOT NULL, occurred_at INTEGER NOT NULL)`,
+    `CREATE INDEX IF NOT EXISTS project_events_project_id_idx ON project_events(project_id)`
+  ]
 }];
 
 export const currentDatabaseVersion = databaseMigrations.at(-1)?.version ?? 0;

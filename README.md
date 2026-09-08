@@ -24,6 +24,17 @@ pnpm cli
 
 Choose actions and tasks by number. Task IDs remain available in the explicit commands for automation, but the guided flow does not require copying them.
 
+Register every local codebase once so Awenes can manage multiple projects and verify that each environment is safe to run:
+
+```powershell
+pnpm cli -- project-add "AwenesOS" . --policy manual
+pnpm cli -- projects
+pnpm cli -- project-doctor <project-id>
+pnpm cli -- project-policy <project-id> approve_push
+```
+
+Completion policies are `manual`, `approve_push`, and `auto_push`. Registration does not start an agent or modify the repository.
+
 Use the returned task ID through the loop:
 
 ```powershell

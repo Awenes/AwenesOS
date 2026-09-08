@@ -38,3 +38,12 @@ Run `pnpm cli` with no command for the guided daily workflow. It provides number
 | `backup [-o file]` | Create a consistent database backup |
 
 Use `pnpm cli -- <command> --help` for arguments and options.
+# Project commands
+
+`project-add <name> [repository]` registers a local Git repository. Use `--branch` to set its default branch and `--policy` to select `manual`, `approve_push`, or `auto_push` completion.
+
+`projects` lists every registered project.
+
+`project-doctor <projectId>` checks repository access, Git, Node.js, pnpm, and dedicated-worktree support without changing the project.
+
+`project-policy <projectId> <policy>` changes the completion policy and records the change as an append-only event.

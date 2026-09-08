@@ -70,3 +70,21 @@ export const notificationPreferences = sqliteTable("notification_preferences", {
 export const manualCrmUpdates = sqliteTable("manual_crm_updates", {
   id: text("id").primaryKey(), taskId: text("task_id").notNull().references(() => tasks.id), desiredStatus: text("desired_status").notNull(), description: text("description"), status: text("status").notNull(), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(), confirmedAt: integer("confirmed_at", { mode: "timestamp_ms" }), supersededAt: integer("superseded_at", { mode: "timestamp_ms" })
 });
+
+export const projects = sqliteTable("projects", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  repositoryRoot: text("repository_root").notNull(),
+  defaultBranch: text("default_branch").notNull(),
+  completionPolicy: text("completion_policy").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull()
+}, (table) => [uniqueIndex("projects_repository_root_unique").on(table.repositoryRoot)]);
+
+export const projectEvents = sqliteTable("project_events", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").notNull().references(() => projects.id),
+  type: text("type").notNull(),
+  data: text("data", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+  occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull()
+});

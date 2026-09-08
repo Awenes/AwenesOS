@@ -19,12 +19,17 @@ import { ReportingService } from "./application/reporting-service.js";
 import { ReportDateSchema } from "./domain/reporting.js";
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { ProjectService } from "./application/project-service.js";
+import { CompletionPolicySchema } from "./domain/project.js";
+import { LocalEnvironmentInspector } from "./infrastructure/environment/local-environment-inspector.js";
+import { ProjectRepository } from "./infrastructure/repositories/project-repository.js";
 
 const { db, client, path: databasePath, migration } = await openDatabase();
 const repository = new TaskRepository(db);
 const service = new TaskService(repository, new ManualCrmAdapter(), "manual");
 const notifications = new NotificationService(repository);
 const reporting = new ReportingService(repository);
+const projectService = new ProjectService(new ProjectRepository(db), new LocalEnvironmentInspector());
 const cli = new Command().name("awenes").description("Awenes OS local-first work engine").version("0.1.0");
 
 async function guided() {
@@ -79,6 +84,15 @@ cli.command("notification-dismiss").description("Dismiss the current occurrence 
 cli.command("notification-snooze").description("Snooze a notification for a friendly duration such as 30m, 1h, or 1d").argument("<key>").argument("[duration]", "duration: m=minutes, h=hours, d=days", "1h").action(async (key, duration) => print(await notifications.snoozeFor(key, duration)));
 cli.command("doctor").description("Check database integrity, foreign keys, and migration version").action(async () => print({ databasePath, migration, ...(await inspectDatabase(client)) }));
 cli.command("backup").description("Create a consistent local database backup").option("-o, --output <file>", "backup destination").action(async (options) => print({ backupPath: await createDatabaseBackup(client, databasePath, options.output) }));
+cli.command("project-add")
+  .description("Register a local project and its default completion policy")
+  .argument("<name>").argument("[repository]", "local Git repository path", ".")
+  .option("-b, --branch <branch>", "default branch", "main")
+  .option("-p, --policy <policy>", "manual, approve_push, or auto_push", "manual")
+  .action(async (name, repository, options) => print(await projectService.register({ name, repositoryRoot: repository, defaultBranch: options.branch, completionPolicy: CompletionPolicySchema.parse(options.policy) })));
+cli.command("projects").description("List registered local projects").action(async () => table(await projectService.list()));
+cli.command("project-doctor").description("Check whether a project is ready for isolated agent execution").argument("<projectId>").action(async (projectId) => print(await projectService.readiness(projectId)));
+cli.command("project-policy").description("Change a project's completion policy").argument("<projectId>").argument("<policy>", "manual, approve_push, or auto_push").action(async (projectId, policy) => print(await projectService.setCompletionPolicy(projectId, CompletionPolicySchema.parse(policy))));
 cli.command("tracker-updates").description("List completed tracker tasks awaiting your manual SharePoint update").action(async () => table(await service.pendingTrackerUpdates()));
 cli.command("tracker-confirm").description("Confirm that you manually updated the live SharePoint tracker").argument("<taskId>").action(async (taskId) => print(await service.confirmTrackerUpdate(taskId)));
 cli.command("tracker-import")

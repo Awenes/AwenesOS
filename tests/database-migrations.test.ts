@@ -16,8 +16,8 @@ describe("database migrations", () => {
   it("creates and records the current schema for a new database", async () => {
     const directory = await mkdtemp(join(tmpdir(), "awenes-migration-")); dirs.push(directory); const path = join(directory, "awenes.db");
     const opened = await openDatabase(path);
-    expect(opened.migration).toMatchObject({ fromVersion: 0, toVersion: 2, applied: [1, 2], backupPath: null });
-    expect(await inspectDatabase(opened.client)).toEqual({ healthy: true, integrity: "ok", foreignKeyViolations: 0, databaseVersion: 2, currentVersion: 2 });
+    expect(opened.migration).toMatchObject({ fromVersion: 0, toVersion: 3, applied: [1, 2, 3], backupPath: null });
+    expect(await inspectDatabase(opened.client)).toEqual({ healthy: true, integrity: "ok", foreignKeyViolations: 0, databaseVersion: 3, currentVersion: 3 });
     await opened.client.close();
   });
 
@@ -27,7 +27,7 @@ describe("database migrations", () => {
     await legacy.execute(`CREATE TABLE tasks (id TEXT PRIMARY KEY, title TEXT NOT NULL, source TEXT NOT NULL, source_reference TEXT, assignment_description TEXT NOT NULL DEFAULT '', completion_description TEXT, status TEXT NOT NULL, assigned_to_me INTEGER NOT NULL DEFAULT 0, sync_error TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, completed_at INTEGER)`);
     await legacy.execute({ sql: `INSERT INTO tasks (id,title,source,assignment_description,status,assigned_to_me,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)`, args: ["legacy-1", "Preserve me", "manual", "", "captured", 0, 1, 1] }); await legacy.close();
     const opened = await openDatabase(path);
-    expect(opened.migration.applied).toEqual([1, 2]); expect(opened.migration.backupPath).toBeTruthy(); expect((await stat(opened.migration.backupPath!)).isFile()).toBe(true);
+    expect(opened.migration.applied).toEqual([1, 2, 3]); expect(opened.migration.backupPath).toBeTruthy(); expect((await stat(opened.migration.backupPath!)).isFile()).toBe(true);
     expect((await opened.client.execute(`SELECT title FROM tasks WHERE id = 'legacy-1'`)).rows[0]?.title).toBe("Preserve me");
     expect((await readdir(join(directory, "backups"))).length).toBe(1); await opened.client.close();
   });
@@ -35,6 +35,6 @@ describe("database migrations", () => {
   it("does not create another backup when no migration is pending", async () => {
     const directory = await mkdtemp(join(tmpdir(), "awenes-current-")); dirs.push(directory); const path = join(directory, "awenes.db");
     const first = await openDatabase(path); await first.client.close(); const second = await openDatabase(path);
-    expect(second.migration).toMatchObject({ fromVersion: 2, toVersion: 2, applied: [], backupPath: null }); await second.client.close();
+    expect(second.migration).toMatchObject({ fromVersion: 3, toVersion: 3, applied: [], backupPath: null }); await second.client.close();
   });
 });
