@@ -31,9 +31,16 @@ pnpm cli -- project-add "AwenesOS" . --policy manual
 pnpm cli -- projects
 pnpm cli -- project-doctor <project-id>
 pnpm cli -- project-policy <project-id> approve_push
+pnpm cli -- task-project <task-id> <project-id>
+pnpm cli -- project-tasks <project-id>
+pnpm cli -- execution-policy-show <project-id>
+pnpm cli -- execution-policy-set <project-id> --config .\execution-policy.json
+pnpm cli -- worktree-create <task-id>
 ```
 
 Completion policies are `manual`, `approve_push`, and `auto_push`. Registration does not start an agent or modify the repository.
+
+Execution policies are restrictive by default: public network access is disabled, environment variables and commands require allowlisting, browser profiles must be isolated, and Git push requires developer approval. `worktree-create` creates a task branch outside the normal checkout and prevents concurrent write work for the same project.
 
 Use the returned task ID through the loop:
 

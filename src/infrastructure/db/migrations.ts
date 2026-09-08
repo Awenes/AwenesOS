@@ -32,6 +32,17 @@ export const databaseMigrations: DatabaseMigration[] = [{
     `CREATE TABLE IF NOT EXISTS project_events (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id), type TEXT NOT NULL, data TEXT NOT NULL, occurred_at INTEGER NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS project_events_project_id_idx ON project_events(project_id)`
   ]
+}, {
+  version: 4,
+  name: "task_projects_policies_and_worktrees",
+  statements: [
+    `ALTER TABLE tasks ADD COLUMN project_id TEXT REFERENCES projects(id)`,
+    `CREATE INDEX IF NOT EXISTS tasks_project_id_idx ON tasks(project_id)`,
+    `CREATE TABLE IF NOT EXISTS project_execution_policies (project_id TEXT PRIMARY KEY REFERENCES projects(id), policy TEXT NOT NULL, updated_at INTEGER NOT NULL)`,
+    `CREATE TABLE IF NOT EXISTS task_worktrees (id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id), project_id TEXT NOT NULL REFERENCES projects(id), path TEXT NOT NULL, branch TEXT NOT NULL, base_branch TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, released_at INTEGER)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS task_worktrees_task_unique ON task_worktrees(task_id)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS task_worktrees_path_unique ON task_worktrees(path)`
+  ]
 }];
 
 export const currentDatabaseVersion = databaseMigrations.at(-1)?.version ?? 0;

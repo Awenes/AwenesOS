@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { RegisterProjectSchema, type CompletionPolicy, type EnvironmentInspector, type RegisterProject } from "../domain/project.js";
+import { ExecutionPolicySchema, RegisterProjectSchema, type CompletionPolicy, type EnvironmentInspector, type ExecutionPolicy, type RegisterProject } from "../domain/project.js";
 import type { ProjectRepository } from "../infrastructure/repositories/project-repository.js";
 
 export class ProjectService {
@@ -17,4 +17,7 @@ export class ProjectService {
   async setCompletionPolicy(id: string, completionPolicy: CompletionPolicy) {
     return this.repository.setCompletionPolicy(id, completionPolicy);
   }
+
+  executionPolicy(id: string) { return this.repository.executionPolicy(id); }
+  setExecutionPolicy(id: string, policy: ExecutionPolicy) { return this.repository.saveExecutionPolicy(id, ExecutionPolicySchema.parse(policy)); }
 }

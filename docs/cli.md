@@ -47,3 +47,9 @@ Use `pnpm cli -- <command> --help` for arguments and options.
 `project-doctor <projectId>` checks repository access, Git, Node.js, pnpm, and dedicated-worktree support without changing the project.
 
 `project-policy <projectId> <policy>` changes the completion policy and records the change as an append-only event.
+
+`task-project <taskId> <projectId>` assigns a task to a registered project. `project-tasks <projectId>` shows its queue.
+
+`execution-policy-show <projectId>` displays the effective safety policy. `execution-policy-set <projectId> --config <file>` replaces it with a validated JSON policy and records an event.
+
+`worktree-create <taskId>` creates the task's isolated branch and worktree. Only one active write worktree is allowed per project. `worktree-release <taskId>` removes the clean worktree through Git and records its release; Git refuses to remove a dirty worktree.

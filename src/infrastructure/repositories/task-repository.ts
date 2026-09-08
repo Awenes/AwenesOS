@@ -32,7 +32,7 @@ export class TaskRepository {
 
   async create(input: CaptureTask): Promise<Task> {
     const now = input.occurredAt;
-    const task: Task = { id: randomUUID(), title: input.title, source: input.source, sourceReference: input.sourceReference ?? null, assignmentDescription: input.assignmentDescription, completionDescription: null, status: input.assignedToMe ? "assigned" : "captured", assignedToMe: input.assignedToMe, syncError: null, createdAt: now, updatedAt: now, completedAt: null };
+    const task: Task = { id: randomUUID(), projectId: null, title: input.title, source: input.source, sourceReference: input.sourceReference ?? null, assignmentDescription: input.assignmentDescription, completionDescription: null, status: input.assignedToMe ? "assigned" : "captured", assignedToMe: input.assignedToMe, syncError: null, createdAt: now, updatedAt: now, completedAt: null };
     await this.db.insert(tasks).values(task);
     await this.event(task.id, "task.captured", { source: task.source, assignedToMe: task.assignedToMe }, now);
     return task;
@@ -49,9 +49,20 @@ export class TaskRepository {
     return rows as Task[];
   }
 
+  async listForProject(projectId: string): Promise<Task[]> {
+    return await this.db.select().from(tasks).where(eq(tasks.projectId, projectId)).orderBy(desc(tasks.updatedAt)) as Task[];
+  }
+
   async findBySourceReference(sourceReference: string): Promise<Task | null> {
     const row = await this.db.query.tasks.findFirst({ where: eq(tasks.sourceReference, sourceReference) });
     return row ? row as Task : null;
+  }
+
+  async assignProject(taskId: string, projectId: string): Promise<Task> {
+    const task = await this.get(taskId); const now = new Date();
+    await this.db.update(tasks).set({ projectId, updatedAt: now }).where(eq(tasks.id, taskId));
+    await this.event(taskId, task.projectId ? "task.project_reassigned" : "task.project_assigned", { from: task.projectId, to: projectId }, now);
+    return this.get(taskId);
   }
 
   async transition(id: string, from: TaskStatus, to: TaskStatus, eventType: string, data: Record<string, unknown> = {}): Promise<Task> {

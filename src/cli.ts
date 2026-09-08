@@ -20,16 +20,20 @@ import { ReportDateSchema } from "./domain/reporting.js";
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { ProjectService } from "./application/project-service.js";
-import { CompletionPolicySchema } from "./domain/project.js";
+import { CompletionPolicySchema, ExecutionPolicySchema } from "./domain/project.js";
 import { LocalEnvironmentInspector } from "./infrastructure/environment/local-environment-inspector.js";
 import { ProjectRepository } from "./infrastructure/repositories/project-repository.js";
+import { WorktreeService } from "./application/worktree-service.js";
+import { LocalWorktreeDriver } from "./infrastructure/git/local-worktree-driver.js";
 
 const { db, client, path: databasePath, migration } = await openDatabase();
 const repository = new TaskRepository(db);
 const service = new TaskService(repository, new ManualCrmAdapter(), "manual");
 const notifications = new NotificationService(repository);
 const reporting = new ReportingService(repository);
-const projectService = new ProjectService(new ProjectRepository(db), new LocalEnvironmentInspector());
+const projectRepository = new ProjectRepository(db);
+const projectService = new ProjectService(projectRepository, new LocalEnvironmentInspector());
+const worktrees = new WorktreeService(projectRepository, repository, new LocalWorktreeDriver());
 const cli = new Command().name("awenes").description("Awenes OS local-first work engine").version("0.1.0");
 
 async function guided() {
@@ -93,6 +97,12 @@ cli.command("project-add")
 cli.command("projects").description("List registered local projects").action(async () => table(await projectService.list()));
 cli.command("project-doctor").description("Check whether a project is ready for isolated agent execution").argument("<projectId>").action(async (projectId) => print(await projectService.readiness(projectId)));
 cli.command("project-policy").description("Change a project's completion policy").argument("<projectId>").argument("<policy>", "manual, approve_push, or auto_push").action(async (projectId, policy) => print(await projectService.setCompletionPolicy(projectId, CompletionPolicySchema.parse(policy))));
+cli.command("task-project").description("Assign or move a task to a registered project").argument("<taskId>").argument("<projectId>").action(async (taskId, projectId) => print(await service.assignProject(taskId, projectId, projectRepository)));
+cli.command("project-tasks").description("List tasks assigned to a project").argument("<projectId>").action(async (projectId) => table(await service.tasksForProject(projectId)));
+cli.command("execution-policy-show").description("Show a project's effective execution permissions").argument("<projectId>").action(async (projectId) => print(await projectService.executionPolicy(projectId)));
+cli.command("execution-policy-set").description("Replace a project's execution permissions from JSON").argument("<projectId>").requiredOption("-c, --config <file>").action(async (projectId, options) => print(await projectService.setExecutionPolicy(projectId, ExecutionPolicySchema.parse(JSON.parse(await readFile(options.config, "utf8"))))));
+cli.command("worktree-create").description("Create an isolated task branch and worktree").argument("<taskId>").action(async (taskId) => print(await worktrees.create(taskId)));
+cli.command("worktree-release").description("Remove and release an isolated task worktree after review").argument("<taskId>").action(async (taskId) => print(await worktrees.release(taskId)));
 cli.command("tracker-updates").description("List completed tracker tasks awaiting your manual SharePoint update").action(async () => table(await service.pendingTrackerUpdates()));
 cli.command("tracker-confirm").description("Confirm that you manually updated the live SharePoint tracker").argument("<taskId>").action(async (taskId) => print(await service.confirmTrackerUpdate(taskId)));
 cli.command("tracker-import")

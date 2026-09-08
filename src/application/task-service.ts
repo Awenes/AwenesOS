@@ -5,6 +5,7 @@ import type { GitEvidenceCollector, GitRepositoryInspector } from "../domain/git
 import { draftCompletionDescription } from "./completion-draft.js";
 import { ReportingService } from "./reporting-service.js";
 import { calculateTaskDuration, formatDuration } from "../domain/task-duration.js";
+import type { ProjectRepository } from "../infrastructure/repositories/project-repository.js";
 
 export class TaskService {
   constructor(private readonly repository: TaskRepository, private readonly crm: CrmTaskAdapter, private readonly crmMode: CrmCoordinationMode = "automatic") {}
@@ -14,6 +15,12 @@ export class TaskService {
   queue() { return this.repository.list(["planned", "in_progress", "paused", "ready_to_complete", "sync_pending"]); }
   allTasks() { return this.repository.list(); }
   history(id: string) { return this.repository.history(id); }
+
+  async assignProject(id: string, projectId: string, projects: ProjectRepository) {
+    await projects.get(projectId); return this.repository.assignProject(id, projectId);
+  }
+
+  tasksForProject(projectId: string) { return this.repository.listForProject(projectId); }
 
   async confirm(id: string) { return this.move(id, "assigned", "task.confirmed"); }
   async claim(id: string) {

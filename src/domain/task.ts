@@ -24,6 +24,7 @@ export type CaptureTask = z.infer<typeof CaptureTaskSchema>;
 
 export interface Task {
   id: string;
+  projectId: string | null;
   title: string;
   source: TaskSource;
   sourceReference: string | null;
