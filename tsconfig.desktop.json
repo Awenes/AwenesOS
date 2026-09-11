@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist-desktop/main",
+    "rootDir": ".",
+    "types": ["node"],
+    "declaration": false,
+    "sourceMap": true
+  },
+  "include": ["desktop/main.ts", "desktop/preload.cts", "desktop/contracts.ts", "src/**/*.ts"],
+  "exclude": ["tests", "desktop/renderer"]
+}

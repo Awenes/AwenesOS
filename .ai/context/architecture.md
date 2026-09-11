@@ -1,11 +1,12 @@
 # Architecture context
 
-The dependency direction is `CLI → application → domain`; infrastructure implements persistence and CRM ports used by application services.
+The dependency direction is `CLI/Desktop → application → domain`; infrastructure implements persistence, Git, environment, and CRM ports used by application services.
 
 - Domain: vocabulary, schemas, legal lifecycle transitions, CRM port.
 - Application: use-case orchestration and trust rules.
 - Infrastructure: SQLite/Drizzle repository and replaceable CRM adapters.
-- CLI: input/output only.
+- CLI: terminal input/output only.
+- Desktop: sandboxed React renderer → narrow validated IPC bridge → application services. The renderer never imports infrastructure or accesses Node.js directly.
 
 SQLite is upgraded through ordered, versioned migrations at startup. Drizzle owns typed queries and schema declarations.
 

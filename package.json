@@ -4,27 +4,42 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.19.0",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "check": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json && vite build --config vite.renderer.config.ts && tsc -p tsconfig.desktop.json",
+    "build:core": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit && tsc -p tsconfig.desktop.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
     "cli": "tsx src/cli.ts",
+    "desktop:main": "tsc -p tsconfig.desktop.json",
+    "desktop:renderer": "vite --config vite.renderer.config.ts",
+    "desktop:build": "vite build --config vite.renderer.config.ts && tsc -p tsconfig.desktop.json",
+    "desktop:start": "vite build --config vite.renderer.config.ts && tsc -p tsconfig.desktop.json && electron .",
     "db:generate": "drizzle-kit generate",
     "test": "vitest run",
     "test:watch": "vitest"
   },
+  "main": "dist-desktop/main/desktop/main.js",
   "dependencies": {
     "@libsql/client": "^0.15.15",
     "commander": "^14.0.1",
     "dotenv": "^17.2.2",
     "drizzle-orm": "^0.44.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "zod": "^4.1.5"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
     "drizzle-kit": "^0.31.4",
+    "electron": "^44.3.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
+    "vite": "^8.2.2",
     "vitest": "^3.2.4"
   }
 }

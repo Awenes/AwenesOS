@@ -1,6 +1,7 @@
 node_modules/
 .pnpm-store/
 dist/
+dist-desktop/
 .env
 *.db
 *.db-shm
@@ -11,3 +12,5 @@ work/
 coverage/
 .DS_Store
 Thumbs.db
+*.log
+desktop-preview*.png

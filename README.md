@@ -2,6 +2,8 @@
 
 A local-first Windows work engine that closes the loop from assignment capture to externally confirmed completion and tomorrow's standup. The v0.1 interface is a TypeScript CLI; there is intentionally no dashboard yet.
 
+The in-development desktop preview now provides a graphical command center over the same local application services. It is not a hosted web dashboard and does not execute models yet.
+
 ## Prerequisites
 
 - Windows with Node.js 22+
@@ -21,6 +23,14 @@ For normal daily use, launch the guided session:
 ```powershell
 pnpm cli
 ```
+
+Build and launch the graphical desktop preview:
+
+```powershell
+pnpm desktop:start
+```
+
+See [desktop preview](docs/desktop-preview.md) for its current scope and security boundary.
 
 Choose actions and tasks by number. Task IDs remain available in the explicit commands for automation, but the guided flow does not require copying them.
 
