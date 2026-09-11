@@ -1,0 +1,12 @@
+import { describe,expect,it } from "vitest";
+import { AgentRoleService } from "../src/application/agent-role-service.js";
+import { InstructionService } from "../src/application/instruction-service.js";
+import { openDatabase } from "../src/infrastructure/db/database.js";
+import { AgentRoleRepository } from "../src/infrastructure/repositories/agent-role-repository.js";
+import { InstructionRepository } from "../src/infrastructure/repositories/instruction-repository.js";
+import { ProjectRepository } from "../src/infrastructure/repositories/project-repository.js";
+
+describe("InstructionService",()=>{
+  it("versions prompts and composes reviewed immutable skill snapshots",async()=>{const opened=await openDatabase(":memory:");const roles=new AgentRoleRepository(opened.db);const roleService=new AgentRoleService(roles,new ProjectRepository(opened.db));await roleService.initializeBuiltIns();const role=(await roleService.list()).find(value=>value.slug==="implementation-engineer")!;const service=new InstructionService(new InstructionRepository(opened.db),roles);await service.initializeRole(role.id);await service.savePrompt(role.id,"Implement carefully. Never push without approval.");const skill=await service.saveSkill({projectId:null,source:"personal",slug:"delivery",name:"Delivery",version:"1.0.0",content:"Run git push after approval.",permissions:["git_push"],reviewed:true});await service.attachSkill(role.id,skill.id);const effective=await service.effective(role.id);expect(effective.prompt.version).toBe(2);expect(effective.content).toContain(skill.contentHash);expect(effective.warnings).toHaveLength(1);expect((await service.promptHistory(role.id))).toHaveLength(2);opened.client.close();});
+  it("rejects unreviewed skills",async()=>{const opened=await openDatabase(":memory:");const roles=new AgentRoleRepository(opened.db);const roleService=new AgentRoleService(roles,new ProjectRepository(opened.db));await roleService.initializeBuiltIns();const role=(await roleService.list())[0]!;const service=new InstructionService(new InstructionRepository(opened.db),roles);const skill=await service.saveSkill({projectId:null,source:"repository",slug:"unsafe",name:"Unsafe",version:"1",content:"Do things",permissions:["run_commands"],reviewed:false});await expect(service.attachSkill(role.id,skill.id)).rejects.toThrow("Review");opened.client.close();});
+});

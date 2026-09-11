@@ -146,3 +146,19 @@ export const providerEvents = sqliteTable("provider_events", {
   data: text("data", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
   occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull()
 });
+
+export const rolePromptVersions = sqliteTable("role_prompt_versions", {
+  id: text("id").primaryKey(), roleId: text("role_id").notNull().references(() => agentRoles.id), version: integer("version").notNull(),
+  content: text("content").notNull(), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull()
+}, (table) => [uniqueIndex("role_prompt_versions_role_version_unique").on(table.roleId, table.version)]);
+
+export const skillSnapshots = sqliteTable("skill_snapshots", {
+  id: text("id").primaryKey(), projectId: text("project_id").references(() => projects.id), source: text("source").notNull(), slug: text("slug").notNull(),
+  name: text("name").notNull(), version: text("version").notNull(), content: text("content").notNull(), contentHash: text("content_hash").notNull(),
+  permissions: text("permissions", { mode: "json" }).$type<string[]>().notNull(), reviewed: integer("reviewed", { mode: "boolean" }).notNull(), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull()
+}, (table) => [uniqueIndex("skill_snapshots_hash_unique").on(table.contentHash)]);
+
+export const roleSkillSnapshots = sqliteTable("role_skill_snapshots", {
+  roleId: text("role_id").notNull().references(() => agentRoles.id), skillSnapshotId: text("skill_snapshot_id").notNull().references(() => skillSnapshots.id),
+  attachedAt: integer("attached_at", { mode: "timestamp_ms" }).notNull()
+}, (table) => [uniqueIndex("role_skill_snapshots_unique").on(table.roleId, table.skillSnapshotId)]);

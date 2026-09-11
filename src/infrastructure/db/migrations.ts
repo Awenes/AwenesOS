@@ -60,6 +60,17 @@ export const databaseMigrations: DatabaseMigration[] = [{
     `CREATE TABLE IF NOT EXISTS provider_events (id TEXT PRIMARY KEY, provider_id TEXT NOT NULL REFERENCES provider_connections(id), type TEXT NOT NULL, data TEXT NOT NULL, occurred_at INTEGER NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS provider_events_provider_id_idx ON provider_events(provider_id)`
   ]
+}, {
+  version: 7,
+  name: "prompt_and_skill_snapshots",
+  statements: [
+    `CREATE TABLE IF NOT EXISTS role_prompt_versions (id TEXT PRIMARY KEY, role_id TEXT NOT NULL REFERENCES agent_roles(id), version INTEGER NOT NULL, content TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS role_prompt_versions_role_version_unique ON role_prompt_versions(role_id, version)`,
+    `CREATE TABLE IF NOT EXISTS skill_snapshots (id TEXT PRIMARY KEY, project_id TEXT REFERENCES projects(id), source TEXT NOT NULL, slug TEXT NOT NULL, name TEXT NOT NULL, version TEXT NOT NULL, content TEXT NOT NULL, content_hash TEXT NOT NULL, permissions TEXT NOT NULL, reviewed INTEGER NOT NULL, created_at INTEGER NOT NULL)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS skill_snapshots_hash_unique ON skill_snapshots(content_hash)`,
+    `CREATE TABLE IF NOT EXISTS role_skill_snapshots (role_id TEXT NOT NULL REFERENCES agent_roles(id), skill_snapshot_id TEXT NOT NULL REFERENCES skill_snapshots(id), attached_at INTEGER NOT NULL)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS role_skill_snapshots_unique ON role_skill_snapshots(role_id, skill_snapshot_id)`
+  ]
 }];
 
 export const currentDatabaseVersion = databaseMigrations.at(-1)?.version ?? 0;
