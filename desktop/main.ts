@@ -6,15 +6,20 @@ import type { DesktopSnapshot } from "./contracts.js";
 import { AgentRoleService } from "../src/application/agent-role-service.js";
 import { ProjectService } from "../src/application/project-service.js";
 import { TaskService } from "../src/application/task-service.js";
+import { ProviderService } from "../src/application/provider-service.js";
 import { AgentRoleInputSchema } from "../src/domain/agent-role.js";
 import { CompletionPolicySchema, ExecutionPolicySchema } from "../src/domain/project.js";
 import { TaskSourceSchema } from "../src/domain/task.js";
+import { ProviderConnectionInputSchema } from "../src/domain/provider.js";
 import { ManualCrmAdapter } from "../src/infrastructure/crm/manual-crm-adapter.js";
 import { openDatabase } from "../src/infrastructure/db/database.js";
 import { LocalEnvironmentInspector } from "../src/infrastructure/environment/local-environment-inspector.js";
 import { AgentRoleRepository } from "../src/infrastructure/repositories/agent-role-repository.js";
 import { ProjectRepository } from "../src/infrastructure/repositories/project-repository.js";
 import { TaskRepository } from "../src/infrastructure/repositories/task-repository.js";
+import { ProviderRepository } from "../src/infrastructure/repositories/provider-repository.js";
+import { LocalProviderProbe } from "../src/infrastructure/providers/local-provider-probe.js";
+import { EncryptedSecretVault } from "./encrypted-secret-vault.js";
 
 protocol.registerSchemesAsPrivileged([{ scheme: "awenes", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
@@ -41,9 +46,11 @@ async function start() {
   const taskRepository = new TaskRepository(opened.db);
   const projectRepository = new ProjectRepository(opened.db);
   const roleRepository = new AgentRoleRepository(opened.db);
+  const providerRepository = new ProviderRepository(opened.db);
   const taskService = new TaskService(taskRepository, new ManualCrmAdapter(), "manual");
   const projectService = new ProjectService(projectRepository, new LocalEnvironmentInspector());
   const roleService = new AgentRoleService(roleRepository, projectRepository);
+  const providerService = new ProviderService(providerRepository, new EncryptedSecretVault(join(app.getPath("userData"), "secrets.json")), new LocalProviderProbe());
   await roleService.initializeBuiltIns();
   app.on("before-quit", () => { opened.client.close(); });
 
@@ -55,7 +62,7 @@ async function start() {
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   mainWindow.webContents.on("will-navigate", (event, url) => { if (!url.startsWith("awenes://")) event.preventDefault(); });
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
-  registerIpc(mainWindow, { projectService, taskService, roleService, projectRepository });
+  registerIpc(mainWindow, { projectService, taskService, roleService, providerService, projectRepository });
   await mainWindow.loadURL("awenes://app/index.html");
   const captureArgument = process.argv.find((argument) => argument.startsWith("capture="));
   const capturePath = captureArgument?.slice("capture=".length);
@@ -68,16 +75,16 @@ async function start() {
   }
 }
 
-function registerIpc(window: BrowserWindow, services: { projectService: ProjectService; taskService: TaskService; roleService: AgentRoleService; projectRepository: ProjectRepository }) {
-  const { projectService, taskService, roleService, projectRepository } = services;
+function registerIpc(window: BrowserWindow, services: { projectService: ProjectService; taskService: TaskService; roleService: AgentRoleService; providerService: ProviderService; projectRepository: ProjectRepository }) {
+  const { projectService, taskService, roleService, providerService, projectRepository } = services;
   const trusted = (sender: Electron.WebContents) => sender === window.webContents && sender.getURL().startsWith("awenes://app/");
   const handle = <T>(channel: string, operation: (input: unknown) => Promise<T>) => ipcMain.handle(channel, async (event, input) => {
     if (!trusted(event.sender)) throw new Error("Untrusted desktop request"); return operation(input);
   });
 
   handle("awenes:snapshot", async () => {
-    const [projects, tasks, roles, pendingCrm, pendingTracker] = await Promise.all([projectService.list(), taskService.allTasks(), roleService.list(), taskService.pendingManualCrmUpdates(), taskService.pendingTrackerUpdates()]);
-    return { projects, tasks, roles, pendingCrm: pendingCrm.length, pendingTracker: pendingTracker.length } satisfies DesktopSnapshot;
+    const [projects, tasks, roles, providers, pendingCrm, pendingTracker] = await Promise.all([projectService.list(), taskService.allTasks(), roleService.list(), providerService.list(), taskService.pendingManualCrmUpdates(), taskService.pendingTrackerUpdates()]);
+    return { projects, tasks, roles, providers, pendingCrm: pendingCrm.length, pendingTracker: pendingTracker.length } satisfies DesktopSnapshot;
   });
   handle("awenes:project:add", async (input) => { const value = z.object({ name: z.string(), repositoryRoot: z.string(), defaultBranch: z.string(), completionPolicy: CompletionPolicySchema }).parse(input); await projectService.register(value); });
   handle("awenes:task:capture", async (input) => { const value = z.object({ title: z.string(), source: TaskSourceSchema, description: z.string(), projectId: z.string().uuid().nullable() }).parse(input); const task = await taskService.capture({ title: value.title, source: value.source, assignmentDescription: value.description, assignedToMe: false, occurredAt: new Date() }); if (value.projectId) await taskService.assignProject(task.id, value.projectId, projectRepository); });
@@ -87,6 +94,9 @@ function registerIpc(window: BrowserWindow, services: { projectService: ProjectS
   handle("awenes:policy:set", async (input) => { const value = z.object({ projectId: z.string().uuid(), policy: ExecutionPolicySchema }).parse(input); await projectService.setExecutionPolicy(value.projectId, value.policy); });
   handle("awenes:role:create", async (input) => { await roleService.create(AgentRoleInputSchema.parse(input)); });
   handle("awenes:role:enabled", async (input) => { const value = z.object({ roleId: z.string().uuid(), enabled: z.boolean() }).parse(input); await roleService.setEnabled(value.roleId, value.enabled); });
+  handle("awenes:provider:connect", async (input) => { const value = z.object({ name: z.string(), kind: z.string(), authMethod: z.string(), command: z.string().nullable(), models: z.array(z.string()), apiKey: z.string().optional() }).parse(input); const { apiKey, ...connection } = value; await providerService.connect(ProviderConnectionInputSchema.parse(connection), apiKey); });
+  handle("awenes:provider:verify", async (input) => { await providerService.verify(z.string().uuid().parse(input)); });
+  handle("awenes:provider:disconnect", async (input) => { await providerService.remove(z.string().uuid().parse(input)); });
 }
 
 function contentType(path: string) {

@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { DesktopSnapshot } from "../../contracts";
 import type { ExecutionPolicy } from "../../../src/domain/project";
 
-type View = "overview" | "projects" | "tasks" | "agents" | "safety";
-const empty: DesktopSnapshot = { projects: [], tasks: [], roles: [], pendingCrm: 0, pendingTracker: 0 };
+type View = "overview" | "projects" | "tasks" | "agents" | "providers" | "safety";
+const empty: DesktopSnapshot = { projects: [], tasks: [], roles: [], providers: [], pendingCrm: 0, pendingTracker: 0 };
 
 export function App() {
   const [snapshot, setSnapshot] = useState(empty); const [view, setView] = useState<View>("overview"); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
@@ -13,7 +13,7 @@ export function App() {
   return <div className="shell">
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">A</span><div><strong>AwenesOS</strong><small>Developer command center</small></div></div>
-      <nav>{([['overview','Overview'],['projects','Projects'],['tasks','Tasks'],['agents','Agents'],['safety','Safety']] as const).map(([id,label]) => <button key={id} className={view === id ? "active" : ""} onClick={() => setView(id)}><span>{icon(id)}</span>{label}</button>)}</nav>
+      <nav>{([['overview','Overview'],['projects','Projects'],['tasks','Tasks'],['agents','Agents'],['providers','Providers'],['safety','Safety']] as const).map(([id,label]) => <button key={id} className={view === id ? "active" : ""} onClick={() => setView(id)}><span>{icon(id)}</span>{label}</button>)}</nav>
       <div className="sidebar-foot"><span className="status-dot"/>Local engine online<small>{snapshot.projects.length} projects connected</small></div>
     </aside>
     <main>
@@ -23,9 +23,16 @@ export function App() {
       {view === "projects" && <Projects data={snapshot} refresh={refresh}/>} 
       {view === "tasks" && <Tasks data={snapshot} refresh={refresh}/>} 
       {view === "agents" && <Agents data={snapshot} refresh={refresh}/>} 
+      {view === "providers" && <Providers data={snapshot} refresh={refresh}/>} 
       {view === "safety" && <Safety data={snapshot}/>} 
     </main>
   </div>;
+}
+
+function Providers({ data, refresh }: { data: DesktopSnapshot; refresh: () => Promise<void> }) {
+  const [show,setShow]=useState(false);
+  async function submit(event:FormEvent<HTMLFormElement>){event.preventDefault();const form=new FormData(event.currentTarget);const kind=String(form.get("kind")) as "openai"|"anthropic";const authMethod=String(form.get("auth")) as "api_key"|"cli";await window.awenes.connectProvider({name:String(form.get("name")),kind,authMethod,command:authMethod==="cli"?(kind==="openai"?"codex":"claude"):null,models:split(String(form.get("models"))),apiKey:authMethod==="api_key"?String(form.get("key")):undefined});setShow(false);await refresh();}
+  return <section className="stack"><div className="section-bar"><p>Connect models with an API key or an already authenticated local coding CLI.</p><button className="primary" onClick={()=>setShow(!show)}>+ Connect provider</button></div>{show&&<form className="form-card" onSubmit={e=>void submit(e)}><label>Connection name<input name="name" required placeholder="My OpenAI account"/></label><div className="form-grid"><label>Provider<select name="kind"><option value="openai">OpenAI / Codex</option><option value="anthropic">Anthropic / Claude</option></select></label><label>Authentication<select name="auth"><option value="api_key">API key</option><option value="cli">Existing CLI login</option></select></label></div><label>API key<input name="key" type="password" autoComplete="off" placeholder="Leave blank for CLI login"/></label><label>Models (comma separated)<input name="models" placeholder="Model IDs you intend to use"/></label><div className="form-actions"><button type="button" className="ghost" onClick={()=>setShow(false)}>Cancel</button><button className="primary">Connect and verify</button></div></form>}<div className="cards">{data.providers.map(provider=><article className="project-card" key={provider.id}><div className="project-icon">{provider.kind==="openai"?"O":"C"}</div><div className="grow"><h3>{provider.name}</h3><p>{pretty(provider.authMethod)} · {provider.error??"Credential is stored outside the project database"}</p><div className="tags"><Badge text={pretty(provider.kind)}/><Badge text={pretty(provider.status)}/></div></div><button className="small-button" onClick={async()=>{await window.awenes.verifyProvider(provider.id);await refresh();}}>Verify</button><button className="small-button" onClick={async()=>{await window.awenes.disconnectProvider(provider.id);await refresh();}}>Disconnect</button></article>)}{!data.providers.length&&<Empty title="No model provider connected" copy="API keys are encrypted locally. CLI mode uses the provider tool's own supported login."/>}</div></section>;
 }
 
 function Overview({ data, active, navigate }: { data: DesktopSnapshot; active: DesktopSnapshot["tasks"]; navigate: (view: View) => void }) {
@@ -88,6 +95,6 @@ function Guard({title,copy}:{title:string;copy:string}){return <div><span>✓</s
 function projectName(data:DesktopSnapshot,id:string|null){return data.projects.find(p=>p.id===id)?.name ?? "Unassigned"}
 function pretty(value:string){return value.replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase())}
 function split(value:string){return value.split(",").map(item=>item.trim()).filter(Boolean)}
-function title(view:View){return ({overview:"Command center",projects:"Projects",tasks:"Task workspace",agents:"Agent roles",safety:"Safety and permissions"} as const)[view]}
-function icon(view:View){return ({overview:"⌂",projects:"▦",tasks:"✓",agents:"◎",safety:"◈"} as const)[view]}
+function title(view:View){return ({overview:"Command center",projects:"Projects",tasks:"Task workspace",agents:"Agent roles",providers:"Model providers",safety:"Safety and permissions"} as const)[view]}
+function icon(view:View){return ({overview:"⌂",projects:"▦",tasks:"✓",agents:"◎",providers:"◉",safety:"◈"} as const)[view]}
 function message(error:unknown){return error instanceof Error?error.message:String(error)}

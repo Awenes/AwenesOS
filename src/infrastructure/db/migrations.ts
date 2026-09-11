@@ -52,6 +52,14 @@ export const databaseMigrations: DatabaseMigration[] = [{
     `CREATE TABLE IF NOT EXISTS agent_role_events (id TEXT PRIMARY KEY, role_id TEXT NOT NULL REFERENCES agent_roles(id), type TEXT NOT NULL, data TEXT NOT NULL, occurred_at INTEGER NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS agent_role_events_role_id_idx ON agent_role_events(role_id)`
   ]
+}, {
+  version: 6,
+  name: "provider_connections",
+  statements: [
+    `CREATE TABLE IF NOT EXISTS provider_connections (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, auth_method TEXT NOT NULL, command TEXT, models TEXT NOT NULL, status TEXT NOT NULL, error TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, last_checked_at INTEGER)`,
+    `CREATE TABLE IF NOT EXISTS provider_events (id TEXT PRIMARY KEY, provider_id TEXT NOT NULL REFERENCES provider_connections(id), type TEXT NOT NULL, data TEXT NOT NULL, occurred_at INTEGER NOT NULL)`,
+    `CREATE INDEX IF NOT EXISTS provider_events_provider_id_idx ON provider_events(provider_id)`
+  ]
 }];
 
 export const currentDatabaseVersion = databaseMigrations.at(-1)?.version ?? 0;

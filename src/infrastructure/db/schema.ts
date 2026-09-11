@@ -124,3 +124,25 @@ export const agentRoleEvents = sqliteTable("agent_role_events", {
   id: text("id").primaryKey(), roleId: text("role_id").notNull().references(() => agentRoles.id), type: text("type").notNull(),
   data: text("data", { mode: "json" }).$type<Record<string, unknown>>().notNull(), occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull()
 });
+
+export const providerConnections = sqliteTable("provider_connections", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  kind: text("kind").notNull(),
+  authMethod: text("auth_method").notNull(),
+  command: text("command"),
+  models: text("models", { mode: "json" }).$type<string[]>().notNull(),
+  status: text("status").notNull(),
+  error: text("error"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  lastCheckedAt: integer("last_checked_at", { mode: "timestamp_ms" })
+});
+
+export const providerEvents = sqliteTable("provider_events", {
+  id: text("id").primaryKey(),
+  providerId: text("provider_id").notNull().references(() => providerConnections.id),
+  type: text("type").notNull(),
+  data: text("data", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+  occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull()
+});

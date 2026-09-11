@@ -10,6 +10,9 @@ const api: DesktopApi = {
   executionPolicy: (projectId) => ipcRenderer.invoke("awenes:policy:get", projectId),
   saveExecutionPolicy: (input) => ipcRenderer.invoke("awenes:policy:set", input),
   createRole: (input) => ipcRenderer.invoke("awenes:role:create", input),
-  setRoleEnabled: (input) => ipcRenderer.invoke("awenes:role:enabled", input)
+  setRoleEnabled: (input) => ipcRenderer.invoke("awenes:role:enabled", input),
+  connectProvider: (input) => ipcRenderer.invoke("awenes:provider:connect", input),
+  verifyProvider: (providerId) => ipcRenderer.invoke("awenes:provider:verify", providerId),
+  disconnectProvider: (providerId) => ipcRenderer.invoke("awenes:provider:disconnect", providerId)
 };
 contextBridge.exposeInMainWorld("awenes", api);
