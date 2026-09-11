@@ -42,6 +42,18 @@ Completion policies are `manual`, `approve_push`, and `auto_push`. Registration 
 
 Execution policies are restrictive by default: public network access is disabled, environment variables and commands require allowlisting, browser profiles must be isolated, and Git push requires developer approval. `worktree-create` creates a task branch outside the normal checkout and prevents concurrent write work for the same project.
 
+Configure provider-neutral agent roles:
+
+```powershell
+pnpm cli -- roles
+pnpm cli -- roles --project <project-id>
+pnpm cli -- role-create --config .\role.json
+pnpm cli -- role-model <role-id> --provider openai --model <model-id>
+pnpm cli -- role-disable <role-id>
+```
+
+See [agent roles](docs/agent-roles.md) for the built-in roles, capabilities, limits, and custom-role schema.
+
 Use the returned task ID through the loop:
 
 ```powershell

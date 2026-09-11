@@ -53,3 +53,11 @@ Use `pnpm cli -- <command> --help` for arguments and options.
 `execution-policy-show <projectId>` displays the effective safety policy. `execution-policy-set <projectId> --config <file>` replaces it with a validated JSON policy and records an event.
 
 `worktree-create <taskId>` creates the task's isolated branch and worktree. Only one active write worktree is allowed per project. `worktree-release <taskId>` removes the clean worktree through Git and records its release; Git refuses to remove a dirty worktree.
+
+# Agent role commands
+
+`roles [--project <projectId>]` lists global roles and, when provided, roles belonging to that project.
+
+`role-show <roleId>` shows the complete role configuration. `role-create --config <file>` creates a validated custom role from JSON.
+
+`role-model <roleId> --provider <providerId> --model <modelId>` assigns a provider and model together. `role-enable` and `role-disable` control whether a role is eligible for future workflows.

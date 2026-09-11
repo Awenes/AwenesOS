@@ -43,6 +43,15 @@ export const databaseMigrations: DatabaseMigration[] = [{
     `CREATE UNIQUE INDEX IF NOT EXISTS task_worktrees_task_unique ON task_worktrees(task_id)`,
     `CREATE UNIQUE INDEX IF NOT EXISTS task_worktrees_path_unique ON task_worktrees(path)`
   ]
+}, {
+  version: 5,
+  name: "provider_neutral_agent_roles",
+  statements: [
+    `CREATE TABLE IF NOT EXISTS agent_roles (id TEXT PRIMARY KEY, project_id TEXT REFERENCES projects(id), scope_key TEXT NOT NULL, slug TEXT NOT NULL, name TEXT NOT NULL, description TEXT NOT NULL, prompt_template TEXT NOT NULL, provider_id TEXT, model_id TEXT, capabilities TEXT NOT NULL, limits TEXT NOT NULL, enabled INTEGER NOT NULL, built_in INTEGER NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS agent_roles_scope_slug_unique ON agent_roles(scope_key, slug)`,
+    `CREATE TABLE IF NOT EXISTS agent_role_events (id TEXT PRIMARY KEY, role_id TEXT NOT NULL REFERENCES agent_roles(id), type TEXT NOT NULL, data TEXT NOT NULL, occurred_at INTEGER NOT NULL)`,
+    `CREATE INDEX IF NOT EXISTS agent_role_events_role_id_idx ON agent_role_events(role_id)`
+  ]
 }];
 
 export const currentDatabaseVersion = databaseMigrations.at(-1)?.version ?? 0;

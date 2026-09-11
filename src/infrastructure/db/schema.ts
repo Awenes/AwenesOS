@@ -101,3 +101,26 @@ export const taskWorktrees = sqliteTable("task_worktrees", {
   path: text("path").notNull(), branch: text("branch").notNull(), baseBranch: text("base_branch").notNull(), status: text("status").notNull(),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(), releasedAt: integer("released_at", { mode: "timestamp_ms" })
 }, (table) => [uniqueIndex("task_worktrees_task_unique").on(table.taskId), uniqueIndex("task_worktrees_path_unique").on(table.path)]);
+
+export const agentRoles = sqliteTable("agent_roles", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").references(() => projects.id),
+  scopeKey: text("scope_key").notNull(),
+  slug: text("slug").notNull(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  promptTemplate: text("prompt_template").notNull(),
+  providerId: text("provider_id"),
+  modelId: text("model_id"),
+  capabilities: text("capabilities", { mode: "json" }).$type<string[]>().notNull(),
+  limits: text("limits", { mode: "json" }).$type<Record<string, number>>().notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull(),
+  builtIn: integer("built_in", { mode: "boolean" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull()
+}, (table) => [uniqueIndex("agent_roles_scope_slug_unique").on(table.scopeKey, table.slug)]);
+
+export const agentRoleEvents = sqliteTable("agent_role_events", {
+  id: text("id").primaryKey(), roleId: text("role_id").notNull().references(() => agentRoles.id), type: text("type").notNull(),
+  data: text("data", { mode: "json" }).$type<Record<string, unknown>>().notNull(), occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull()
+});

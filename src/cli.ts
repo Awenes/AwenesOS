@@ -25,6 +25,9 @@ import { LocalEnvironmentInspector } from "./infrastructure/environment/local-en
 import { ProjectRepository } from "./infrastructure/repositories/project-repository.js";
 import { WorktreeService } from "./application/worktree-service.js";
 import { LocalWorktreeDriver } from "./infrastructure/git/local-worktree-driver.js";
+import { AgentRoleService } from "./application/agent-role-service.js";
+import { AgentRoleInputSchema } from "./domain/agent-role.js";
+import { AgentRoleRepository } from "./infrastructure/repositories/agent-role-repository.js";
 
 const { db, client, path: databasePath, migration } = await openDatabase();
 const repository = new TaskRepository(db);
@@ -34,6 +37,9 @@ const reporting = new ReportingService(repository);
 const projectRepository = new ProjectRepository(db);
 const projectService = new ProjectService(projectRepository, new LocalEnvironmentInspector());
 const worktrees = new WorktreeService(projectRepository, repository, new LocalWorktreeDriver());
+const roleRepository = new AgentRoleRepository(db);
+const roles = new AgentRoleService(roleRepository, projectRepository);
+await roles.initializeBuiltIns();
 const cli = new Command().name("awenes").description("Awenes OS local-first work engine").version("0.1.0");
 
 async function guided() {
@@ -103,6 +109,12 @@ cli.command("execution-policy-show").description("Show a project's effective exe
 cli.command("execution-policy-set").description("Replace a project's execution permissions from JSON").argument("<projectId>").requiredOption("-c, --config <file>").action(async (projectId, options) => print(await projectService.setExecutionPolicy(projectId, ExecutionPolicySchema.parse(JSON.parse(await readFile(options.config, "utf8"))))));
 cli.command("worktree-create").description("Create an isolated task branch and worktree").argument("<taskId>").action(async (taskId) => print(await worktrees.create(taskId)));
 cli.command("worktree-release").description("Remove and release an isolated task worktree after review").argument("<taskId>").action(async (taskId) => print(await worktrees.release(taskId)));
+cli.command("roles").description("List built-in and project-specific agent roles").option("-p, --project <projectId>").action(async (options) => table(await roles.list(options.project)));
+cli.command("role-show").description("Show an agent role and its effective configuration").argument("<roleId>").action(async (roleId) => print(await roles.get(roleId)));
+cli.command("role-create").description("Create a custom agent role from JSON").requiredOption("-c, --config <file>").action(async (options) => print(await roles.create(AgentRoleInputSchema.parse(JSON.parse(await readFile(options.config, "utf8"))))));
+cli.command("role-model").description("Assign a provider and model to an agent role").argument("<roleId>").requiredOption("--provider <providerId>").requiredOption("--model <modelId>").action(async (roleId, options) => print(await roles.assignModel(roleId, options.provider, options.model)));
+cli.command("role-enable").description("Enable an agent role").argument("<roleId>").action(async (roleId) => print(await roles.setEnabled(roleId, true)));
+cli.command("role-disable").description("Disable an agent role").argument("<roleId>").action(async (roleId) => print(await roles.setEnabled(roleId, false)));
 cli.command("tracker-updates").description("List completed tracker tasks awaiting your manual SharePoint update").action(async () => table(await service.pendingTrackerUpdates()));
 cli.command("tracker-confirm").description("Confirm that you manually updated the live SharePoint tracker").argument("<taskId>").action(async (taskId) => print(await service.confirmTrackerUpdate(taskId)));
 cli.command("tracker-import")
