@@ -14,3 +14,8 @@ coverage/
 Thumbs.db
 *.log
 desktop-preview*.png
+desktop-*-preview.png
+packaged-preview.png
+release/
+acceptance-preview.png
+release-*/

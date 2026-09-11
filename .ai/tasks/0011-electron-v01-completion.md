@@ -1,6 +1,6 @@
 # Electron v0.1 completion
 
-Status: in progress
+Status: implementation complete; awaiting developer acceptance test
 
 Finish the local-first desktop product before the developer acceptance test and later Tauri migration.
 

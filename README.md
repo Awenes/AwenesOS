@@ -1,96 +1,37 @@
-# Awenes OS v0.1
+# AwenesOS v0.1
 
-A local-first Windows work engine that closes the loop from assignment capture to externally confirmed completion and tomorrow's standup. The v0.1 interface is a TypeScript CLI; there is intentionally no dashboard yet.
+AwenesOS is a local-first Windows command center for developers who use agents across multiple local projects. It captures tasks, runs provider-neutral agent workflows in dedicated Git worktrees, gathers evidence, gates sensitive actions, and keeps external CRM and SharePoint updates manual and explicit.
 
-The in-development desktop preview now provides a graphical command center over the same local application services. It is not a hosted web dashboard and does not execute models yet.
+The desktop app is the primary interface. The CLI remains available for diagnostics and scripted workflows.
 
-## Prerequisites
+## Install the desktop app
 
-- Windows with Node.js 22+
-- pnpm 11+
+Run `release/AwenesOS-Setup-0.1.0.exe` and follow the installer. End users do not need Node.js, npm, or pnpm; the packaged application includes its runtime.
 
-## Start
+## First-use walkthrough
+
+1. Register a local Git repository in **Projects**.
+2. Open **Safety**, run the readiness check, and review the project policy.
+3. Connect OpenAI or Anthropic in **Providers** using an API key, or use the experimental Codex/Claude CLI login when that tool is already installed and signed in.
+4. In **Agents**, enable the roles you want, assign each a ready provider/model, review its prompt, and attach reviewed skill snapshots.
+5. Capture a task in **Tasks**, claim it, and create a run.
+6. Approve the start request in **Approvals**, then advance the stages from **Runs**.
+7. Review evidence and the Git diff. Depending on the project policy, finish manually, commit locally, or approve and push.
+8. Update the live CRM or SharePoint tracker yourself when prompted, then confirm the update in AwenesOS. Completion remains pending until that confirmation.
+
+## Development
+
+Requires Node.js 22+ and pnpm 11+.
 
 ```powershell
 pnpm install
-Copy-Item .env.example .env
-pnpm cli -- capture "Fix guardian invite flow" --source teams --description "Prevent duplicate invites"
-pnpm cli -- inbox
-```
-
-For normal daily use, launch the guided session:
-
-```powershell
-pnpm cli
-```
-
-Build and launch the graphical desktop preview:
-
-```powershell
+pnpm check
+pnpm test
+pnpm build
 pnpm desktop:start
+pnpm package:win
 ```
 
-See [desktop preview](docs/desktop-preview.md) for its current scope and security boundary.
+Execution is restrictive by default: work happens in a dedicated worktree, commands and environment variables require allowlisting, public network access is disabled, localhost is a separate permission, browser tests use an isolated profile, and Git push requires a stored developer approval. AwenesOS does not claim OS-level process or network isolation on Windows.
 
-Choose actions and tasks by number. Task IDs remain available in the explicit commands for automation, but the guided flow does not require copying them.
-
-Register every local codebase once so Awenes can manage multiple projects and verify that each environment is safe to run:
-
-```powershell
-pnpm cli -- project-add "AwenesOS" . --policy manual
-pnpm cli -- projects
-pnpm cli -- project-doctor <project-id>
-pnpm cli -- project-policy <project-id> approve_push
-pnpm cli -- task-project <task-id> <project-id>
-pnpm cli -- project-tasks <project-id>
-pnpm cli -- execution-policy-show <project-id>
-pnpm cli -- execution-policy-set <project-id> --config .\execution-policy.json
-pnpm cli -- worktree-create <task-id>
-```
-
-Completion policies are `manual`, `approve_push`, and `auto_push`. Registration does not start an agent or modify the repository.
-
-Execution policies are restrictive by default: public network access is disabled, environment variables and commands require allowlisting, browser profiles must be isolated, and Git push requires developer approval. `worktree-create` creates a task branch outside the normal checkout and prevents concurrent write work for the same project.
-
-Configure provider-neutral agent roles:
-
-```powershell
-pnpm cli -- roles
-pnpm cli -- roles --project <project-id>
-pnpm cli -- role-create --config .\role.json
-pnpm cli -- role-model <role-id> --provider openai --model <model-id>
-pnpm cli -- role-disable <role-id>
-```
-
-See [agent roles](docs/agent-roles.md) for the built-in roles, capabilities, limits, and custom-role schema.
-
-Use the returned task ID through the loop:
-
-```powershell
-pnpm cli -- claim <id>
-pnpm cli -- crm-map <id> --project current-project --external-id CRM-123
-pnpm cli -- start <id>
-pnpm cli -- crm-updates
-pnpm cli -- crm-confirm <id>
-pnpm cli -- evidence <id> --kind commit --value "83fa21"
-pnpm cli -- evidence <id> --kind test --value "Invite validation tests passed"
-pnpm cli -- prepare-completion <id>
-pnpm cli -- edit-completion <id> --description "Prevented duplicate invitations and added regression coverage."
-pnpm cli -- complete <id>
-pnpm cli -- crm-updates
-pnpm cli -- crm-confirm <id>
-pnpm cli -- duration <id>
-pnpm cli -- task-summary <id>
-pnpm cli -- history <id>
-pnpm cli -- standup
-```
-
-`crm-map` records an existing CRM reference; it does not create or change anything externally. Start, pause, resume, and finish actions queue a manual CRM instruction. After applying the latest instruction in the live CRM, run `crm-confirm <id>`. Completion stays `sync_pending` until that confirmation.
-
-## State model
-
-`captured → assigned → planned → in_progress ↔ paused → ready_to_complete → sync_pending → completed`
-
-Claiming permits `captured → planned`. A local completion remains `sync_pending` until the CRM confirms its description and completed status update.
-
-See [architecture](docs/architecture.md), [CLI reference](docs/cli.md), and [CRM investigation checklist](docs/crm-adapter.md).
+See [desktop guide](docs/desktop-preview.md), [architecture](docs/architecture.md), [CLI reference](docs/cli.md), and [CRM workflow](docs/crm-adapter.md).

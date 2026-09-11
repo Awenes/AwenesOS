@@ -1,2 +1,131 @@
-import{describe,expect,it}from"vitest";import{BrowserTestService,type BrowserAutomation}from"../src/application/browser-test-service.js";import{BrowserTestConfigSchema}from"../src/domain/browser-test.js";import type{ManagedCommandExecutor}from"../src/domain/execution.js";import type{SecretVault}from"../src/domain/provider.js";import{openDatabase}from"../src/infrastructure/db/database.js";import{BrowserTestRepository}from"../src/infrastructure/repositories/browser-test-repository.js";import{ProjectRepository}from"../src/infrastructure/repositories/project-repository.js";import{TaskRepository}from"../src/infrastructure/repositories/task-repository.js";import{WorkflowRepository}from"../src/infrastructure/repositories/workflow-repository.js";
-describe("BrowserTestService",()=>{it("rejects non-local targets",()=>{expect(()=>BrowserTestConfigSchema.parse({projectId:crypto.randomUUID(),baseUrl:"https://example.com",healthCheckUrl:"https://example.com/health",startCommand:"pnpm",browserExecutable:"chrome",assertions:[{type:"status",value:200}]})).toThrow("localhost");});it("resolves encrypted credentials and persists evidence",async()=>{const opened=await openDatabase(":memory:");const projects=new ProjectRepository(opened.db),tasks=new TaskRepository(opened.db),runs=new WorkflowRepository(opened.db),repository=new BrowserTestRepository(opened.db);const project=await projects.create({name:"App",repositoryRoot:"C:\\app",defaultBranch:"main",completionPolicy:"manual"});await projects.saveExecutionPolicy(project.id,{networkAccess:"localhost",environmentAllowlist:[],commandAllowlist:["pnpm"],processTimeoutSeconds:30,requirePushApproval:true,isolatedBrowserProfile:true});const task=await tasks.create({title:"T",source:"manual",assignmentDescription:"",assignedToMe:true,occurredAt:new Date()});await tasks.assignProject(task.id,project.id);const run=await runs.create(task.id,project.id);const values=new Map<string,string>();const vault:SecretVault={set:async(k,v)=>{values.set(k,v);},get:async k=>values.get(k)??null,delete:async()=>{}};let credentials:Record<string,string>={};const automation:BrowserAutomation={verify:async input=>{credentials=input.credentials;return{passed:true,screenshotPath:"shot.png",tracePath:"trace.zip",consoleErrors:[],failedRequests:[],assertions:[{assertion:{type:"status",value:200},passed:true,detail:"Passed"}]};}};const commands:ManagedCommandExecutor={execute:async()=>({exitCode:0,stdout:"",stderr:"",timedOut:false,startedAt:new Date(),completedAt:new Date()}),start:async()=>({pid:1,stop:async()=>{}})};const service=new BrowserTestService(repository,projects,vault,automation,async()=>commands,"outputs");const config={projectId:project.id,baseUrl:"http://localhost:3000",healthCheckUrl:"http://localhost:3000/health",startCommand:"pnpm",startArgs:["dev"],setupCommand:null,cleanupCommand:null,credentialKeys:["password"],actions:[{type:"fill" as const,selector:"#password",credentialKey:"password"}],assertions:[{type:"status" as const,value:200}],browserExecutable:"chrome"};await service.saveConfig(config);await service.saveCredential(project.id,"password","secret");expect((await service.verify(run.id,project.id,"C:\\work")).passed).toBe(true);expect(credentials).toEqual({password:"secret"});expect(await service.evidence(run.id)).toHaveLength(1);opened.client.close();});});
+import { describe, expect, it } from "vitest";
+import {
+  BrowserTestService,
+  type BrowserAutomation,
+} from "../src/application/browser-test-service.js";
+import { BrowserTestConfigSchema } from "../src/domain/browser-test.js";
+import type { ManagedCommandExecutor } from "../src/domain/execution.js";
+import type { SecretVault } from "../src/domain/provider.js";
+import { openDatabase } from "../src/infrastructure/db/database.js";
+import { BrowserTestRepository } from "../src/infrastructure/repositories/browser-test-repository.js";
+import { ProjectRepository } from "../src/infrastructure/repositories/project-repository.js";
+import { TaskRepository } from "../src/infrastructure/repositories/task-repository.js";
+import { WorkflowRepository } from "../src/infrastructure/repositories/workflow-repository.js";
+describe("BrowserTestService", () => {
+  it("rejects non-local targets", () => {
+    expect(() =>
+      BrowserTestConfigSchema.parse({
+        projectId: crypto.randomUUID(),
+        baseUrl: "https://example.com",
+        healthCheckUrl: "https://example.com/health",
+        startCommand: "pnpm",
+        browserExecutable: "chrome",
+        assertions: [{ type: "status", value: 200 }],
+      }),
+    ).toThrow("localhost");
+  });
+  it("resolves encrypted credentials and persists evidence", async () => {
+    const opened = await openDatabase(":memory:");
+    const projects = new ProjectRepository(opened.db),
+      tasks = new TaskRepository(opened.db),
+      runs = new WorkflowRepository(opened.db),
+      repository = new BrowserTestRepository(opened.db);
+    const project = await projects.create({
+      name: "App",
+      repositoryRoot: "C:\\app",
+      defaultBranch: "main",
+      completionPolicy: "manual",
+    });
+    await projects.saveExecutionPolicy(project.id, {
+      networkAccess: "localhost",
+      environmentAllowlist: [],
+      commandAllowlist: ["pnpm"],
+      processTimeoutSeconds: 30,
+      requirePushApproval: true,
+      isolatedBrowserProfile: true,
+    });
+    const task = await tasks.create({
+      title: "T",
+      source: "manual",
+      assignmentDescription: "",
+      assignedToMe: true,
+      occurredAt: new Date(),
+    });
+    await tasks.assignProject(task.id, project.id);
+    const run = await runs.create(task.id, project.id);
+    const values = new Map<string, string>();
+    const vault: SecretVault = {
+      set: async (k, v) => {
+        values.set(k, v);
+      },
+      get: async (k) => values.get(k) ?? null,
+      delete: async () => {},
+    };
+    let credentials: Record<string, string> = {};
+    const automation: BrowserAutomation = {
+      verify: async (input) => {
+        credentials = input.credentials;
+        return {
+          passed: true,
+          screenshotPath: "shot.png",
+          tracePath: "trace.zip",
+          consoleErrors: [],
+          failedRequests: [],
+          assertions: [
+            {
+              assertion: { type: "status", value: 200 },
+              passed: true,
+              detail: "Passed",
+            },
+          ],
+        };
+      },
+    };
+    const commands: ManagedCommandExecutor = {
+      execute: async () => ({
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+        timedOut: false,
+        startedAt: new Date(),
+        completedAt: new Date(),
+      }),
+      start: async () => ({ pid: 1, stop: async () => {} }),
+    };
+    const service = new BrowserTestService(
+      repository,
+      projects,
+      vault,
+      automation,
+      async () => commands,
+      "outputs",
+    );
+    const config = {
+      projectId: project.id,
+      baseUrl: "http://localhost:3000",
+      healthCheckUrl: "http://localhost:3000/health",
+      startCommand: "pnpm",
+      startArgs: ["dev"],
+      setupCommand: null,
+      cleanupCommand: null,
+      credentialKeys: ["password"],
+      actions: [
+        {
+          type: "fill" as const,
+          selector: "#password",
+          credentialKey: "password",
+        },
+      ],
+      assertions: [{ type: "status" as const, value: 200 }],
+      browserExecutable: "chrome",
+    };
+    await service.saveConfig(config);
+    await service.saveCredential(project.id, "password", "secret");
+    expect((await service.verify(run.id, project.id, "C:\\work")).passed).toBe(
+      true,
+    );
+    expect(credentials).toEqual({ password: "secret" });
+    expect(await service.evidence(run.id)).toHaveLength(1);
+    opened.client.close();
+  });
+});

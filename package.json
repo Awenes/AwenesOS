@@ -1,5 +1,8 @@
 {
   "name": "awenes-os",
+  "productName": "AwenesOS",
+  "description": "A local-first developer command center for safe agent-assisted delivery.",
+  "author": "Awenes",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,11 +19,22 @@
     "desktop:renderer": "vite --config vite.renderer.config.ts",
     "desktop:build": "vite build --config vite.renderer.config.ts && tsc -p tsconfig.desktop.json",
     "desktop:start": "vite build --config vite.renderer.config.ts && tsc -p tsconfig.desktop.json && electron .",
+    "package:win": "pnpm build && electron-builder --win nsis",
     "db:generate": "drizzle-kit generate",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "main": "dist-desktop/main/desktop/main.js",
+  "build": {
+    "appId": "com.awenes.os",
+    "productName": "AwenesOS",
+    "directories": { "output": "release" },
+    "files": ["dist-desktop/**/*", "package.json"],
+    "asar": true,
+    "asarUnpack": ["node_modules/@libsql/**/*", "node_modules/libsql/**/*"],
+    "win": { "target": ["nsis"], "artifactName": "AwenesOS-Setup-${version}.${ext}" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "createStartMenuShortcut": true }
+  },
   "dependencies": {
     "@libsql/client": "^0.15.15",
     "commander": "^14.0.1",
@@ -37,7 +51,9 @@
     "@vitejs/plugin-react": "^6.1.1",
     "drizzle-kit": "^0.31.4",
     "electron": "^44.3.0",
+    "electron-builder": "^26.0.12",
     "playwright-core": "^1.63.0",
+    "prettier": "^3.9.6",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vite": "^8.2.2",

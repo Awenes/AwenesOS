@@ -1,1 +1,33 @@
-import{execFile}from"node:child_process";import{promisify}from"node:util";import type{GitDeliveryDriver}from"../../domain/git-delivery.js";const execute=promisify(execFile);async function git(cwd:string,args:string[]){const result=await execute("git",args,{cwd,windowsHide:true,timeout:120_000,maxBuffer:4_000_000});return result.stdout.trimEnd();}export class LocalGitDeliveryDriver implements GitDeliveryDriver{async review(worktree:string){const[branch,head,status,diffStat,diff]=await Promise.all([git(worktree,["branch","--show-current"]),git(worktree,["rev-parse","HEAD"]),git(worktree,["status","--porcelain"]),git(worktree,["diff","--stat","HEAD"]),git(worktree,["diff","--no-ext-diff","--unified=3","HEAD"])]);return{branch,head,status,diffStat,diff:diff.slice(0,2_000_000)};}async commit(worktree:string,message:string){await git(worktree,["add","-A"]);await git(worktree,["commit","-m",message]);return git(worktree,["rev-parse","HEAD"]);}async push(worktree:string,remote:string,branch:string){await git(worktree,["push","--set-upstream",remote,branch]);}}
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import type { GitDeliveryDriver } from "../../domain/git-delivery.js";
+const execute = promisify(execFile);
+async function git(cwd: string, args: string[]) {
+  const result = await execute("git", args, {
+    cwd,
+    windowsHide: true,
+    timeout: 120_000,
+    maxBuffer: 4_000_000,
+  });
+  return result.stdout.trimEnd();
+}
+export class LocalGitDeliveryDriver implements GitDeliveryDriver {
+  async review(worktree: string) {
+    const [branch, head, status, diffStat, diff] = await Promise.all([
+      git(worktree, ["branch", "--show-current"]),
+      git(worktree, ["rev-parse", "HEAD"]),
+      git(worktree, ["status", "--porcelain"]),
+      git(worktree, ["diff", "--stat", "HEAD"]),
+      git(worktree, ["diff", "--no-ext-diff", "--unified=3", "HEAD"]),
+    ]);
+    return { branch, head, status, diffStat, diff: diff.slice(0, 2_000_000) };
+  }
+  async commit(worktree: string, message: string) {
+    await git(worktree, ["add", "-A"]);
+    await git(worktree, ["commit", "-m", message]);
+    return git(worktree, ["rev-parse", "HEAD"]);
+  }
+  async push(worktree: string, remote: string, branch: string) {
+    await git(worktree, ["push", "--set-upstream", remote, branch]);
+  }
+}
