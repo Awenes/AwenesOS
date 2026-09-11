@@ -90,6 +90,13 @@ export const databaseMigrations: DatabaseMigration[] = [{
     `CREATE TABLE IF NOT EXISTS browser_test_evidence (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES workflow_runs(id), passed INTEGER NOT NULL, screenshot_path TEXT, trace_path TEXT, console_errors TEXT NOT NULL, failed_requests TEXT NOT NULL, assertions TEXT NOT NULL, created_at INTEGER NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS browser_test_evidence_run_idx ON browser_test_evidence(run_id)`
   ]
+}, {
+  version: 10,
+  name: "git_delivery_evidence",
+  statements: [
+    `CREATE TABLE IF NOT EXISTS git_deliveries (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES workflow_runs(id), branch TEXT NOT NULL, commit_sha TEXT, pushed INTEGER NOT NULL, remote TEXT, review TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS git_deliveries_run_unique ON git_deliveries(run_id)`
+  ]
 }];
 
 export const currentDatabaseVersion = databaseMigrations.at(-1)?.version ?? 0;
