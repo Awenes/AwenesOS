@@ -1,0 +1,1 @@
+import{createServer}from"node:http";import{readFile}from"node:fs/promises";createServer(async(req,res)=>{if(req.url==="/health"){res.end("ok");return;}res.setHeader("content-type","text/html");res.end(await readFile(new URL("./index.html",import.meta.url)));}).listen(43197,"127.0.0.1");

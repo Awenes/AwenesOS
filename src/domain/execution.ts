@@ -3,3 +3,5 @@ export const ExecutionRequestSchema=z.object({command:z.string().trim().min(1),a
 export type ExecutionRequest=z.infer<typeof ExecutionRequestSchema>;
 export interface ExecutionResult{exitCode:number|null;stdout:string;stderr:string;timedOut:boolean;startedAt:Date;completedAt:Date;}
 export interface CommandExecutor{execute(input:ExecutionRequest):Promise<ExecutionResult>;}
+export interface ManagedProcess{pid:number;stop():Promise<void>;}
+export interface ManagedCommandExecutor extends CommandExecutor{start(input:ExecutionRequest):Promise<ManagedProcess>;}

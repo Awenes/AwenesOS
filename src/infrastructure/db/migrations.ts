@@ -82,6 +82,14 @@ export const databaseMigrations: DatabaseMigration[] = [{
     `CREATE INDEX IF NOT EXISTS workflow_runs_task_idx ON workflow_runs(task_id)`, `CREATE INDEX IF NOT EXISTS workflow_steps_run_idx ON workflow_steps(run_id)`,
     `CREATE INDEX IF NOT EXISTS workflow_approvals_run_idx ON workflow_approvals(run_id)`, `CREATE INDEX IF NOT EXISTS workflow_events_run_idx ON workflow_events(run_id)`
   ]
+}, {
+  version: 9,
+  name: "localhost_browser_testing",
+  statements: [
+    `CREATE TABLE IF NOT EXISTS browser_test_configs (project_id TEXT PRIMARY KEY REFERENCES projects(id), config TEXT NOT NULL, updated_at INTEGER NOT NULL)`,
+    `CREATE TABLE IF NOT EXISTS browser_test_evidence (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES workflow_runs(id), passed INTEGER NOT NULL, screenshot_path TEXT, trace_path TEXT, console_errors TEXT NOT NULL, failed_requests TEXT NOT NULL, assertions TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+    `CREATE INDEX IF NOT EXISTS browser_test_evidence_run_idx ON browser_test_evidence(run_id)`
+  ]
 }];
 
 export const currentDatabaseVersion = databaseMigrations.at(-1)?.version ?? 0;
