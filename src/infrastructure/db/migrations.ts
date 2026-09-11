@@ -71,6 +71,17 @@ export const databaseMigrations: DatabaseMigration[] = [{
     `CREATE TABLE IF NOT EXISTS role_skill_snapshots (role_id TEXT NOT NULL REFERENCES agent_roles(id), skill_snapshot_id TEXT NOT NULL REFERENCES skill_snapshots(id), attached_at INTEGER NOT NULL)`,
     `CREATE UNIQUE INDEX IF NOT EXISTS role_skill_snapshots_unique ON role_skill_snapshots(role_id, skill_snapshot_id)`
   ]
+}, {
+  version: 8,
+  name: "durable_workflow_runs",
+  statements: [
+    `CREATE TABLE IF NOT EXISTS workflow_runs (id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id), project_id TEXT NOT NULL REFERENCES projects(id), status TEXT NOT NULL, current_stage TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, started_at INTEGER, completed_at INTEGER, error TEXT)`,
+    `CREATE TABLE IF NOT EXISTS workflow_steps (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES workflow_runs(id), ordinal INTEGER NOT NULL, stage TEXT NOT NULL, role_id TEXT REFERENCES agent_roles(id), status TEXT NOT NULL, attempt INTEGER NOT NULL, instruction_snapshot TEXT, output TEXT, started_at INTEGER, completed_at INTEGER)`,
+    `CREATE TABLE IF NOT EXISTS workflow_approvals (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES workflow_runs(id), kind TEXT NOT NULL, status TEXT NOT NULL, detail TEXT NOT NULL, requested_at INTEGER NOT NULL, decided_at INTEGER)`,
+    `CREATE TABLE IF NOT EXISTS workflow_events (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES workflow_runs(id), type TEXT NOT NULL, data TEXT NOT NULL, occurred_at INTEGER NOT NULL)`,
+    `CREATE INDEX IF NOT EXISTS workflow_runs_task_idx ON workflow_runs(task_id)`, `CREATE INDEX IF NOT EXISTS workflow_steps_run_idx ON workflow_steps(run_id)`,
+    `CREATE INDEX IF NOT EXISTS workflow_approvals_run_idx ON workflow_approvals(run_id)`, `CREATE INDEX IF NOT EXISTS workflow_events_run_idx ON workflow_events(run_id)`
+  ]
 }];
 
 export const currentDatabaseVersion = databaseMigrations.at(-1)?.version ?? 0;

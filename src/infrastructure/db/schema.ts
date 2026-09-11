@@ -162,3 +162,19 @@ export const roleSkillSnapshots = sqliteTable("role_skill_snapshots", {
   roleId: text("role_id").notNull().references(() => agentRoles.id), skillSnapshotId: text("skill_snapshot_id").notNull().references(() => skillSnapshots.id),
   attachedAt: integer("attached_at", { mode: "timestamp_ms" }).notNull()
 }, (table) => [uniqueIndex("role_skill_snapshots_unique").on(table.roleId, table.skillSnapshotId)]);
+
+export const workflowRuns = sqliteTable("workflow_runs", {
+  id:text("id").primaryKey(), taskId:text("task_id").notNull().references(()=>tasks.id), projectId:text("project_id").notNull().references(()=>projects.id),
+  status:text("status").notNull(), currentStage:text("current_stage"), createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull(), updatedAt:integer("updated_at",{mode:"timestamp_ms"}).notNull(),
+  startedAt:integer("started_at",{mode:"timestamp_ms"}), completedAt:integer("completed_at",{mode:"timestamp_ms"}), error:text("error")
+});
+export const workflowSteps = sqliteTable("workflow_steps", {
+  id:text("id").primaryKey(), runId:text("run_id").notNull().references(()=>workflowRuns.id), ordinal:integer("ordinal").notNull(), stage:text("stage").notNull(), roleId:text("role_id").references(()=>agentRoles.id),
+  status:text("status").notNull(), attempt:integer("attempt").notNull(), instructionSnapshot:text("instruction_snapshot",{mode:"json"}).$type<Record<string,unknown>>(), output:text("output"), startedAt:integer("started_at",{mode:"timestamp_ms"}), completedAt:integer("completed_at",{mode:"timestamp_ms"})
+});
+export const workflowApprovals = sqliteTable("workflow_approvals", {
+  id:text("id").primaryKey(), runId:text("run_id").notNull().references(()=>workflowRuns.id), kind:text("kind").notNull(), status:text("status").notNull(), detail:text("detail").notNull(), requestedAt:integer("requested_at",{mode:"timestamp_ms"}).notNull(), decidedAt:integer("decided_at",{mode:"timestamp_ms"})
+});
+export const workflowEvents = sqliteTable("workflow_events", {
+  id:text("id").primaryKey(), runId:text("run_id").notNull().references(()=>workflowRuns.id), type:text("type").notNull(), data:text("data",{mode:"json"}).$type<Record<string,unknown>>().notNull(), occurredAt:integer("occurred_at",{mode:"timestamp_ms"}).notNull()
+});

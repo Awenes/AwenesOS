@@ -1,0 +1,17 @@
+import type { InstructionService } from "./instruction-service.js";
+import type { AgentRoleRepository } from "../infrastructure/repositories/agent-role-repository.js";
+import type { ProjectRepository } from "../infrastructure/repositories/project-repository.js";
+import type { TaskRepository } from "../infrastructure/repositories/task-repository.js";
+import type { WorkflowRepository } from "../infrastructure/repositories/workflow-repository.js";
+import type { ApprovalKind, WorkflowStage } from "../domain/workflow.js";
+
+const stages:WorkflowStage[]=["plan","implement","review","test","delivery"];
+const roleForStage:Record<WorkflowStage,string|null>={plan:"senior-engineer",implement:"implementation-engineer",review:"reviewer",test:"tester",delivery:null};
+export class WorkflowService {
+  constructor(private runs:WorkflowRepository,private tasks:TaskRepository,private projects:ProjectRepository,private roles:AgentRoleRepository,private instructions:InstructionService){}
+  list(){return this.runs.list();} get(id:string){return this.runs.get(id);} steps(id:string){return this.runs.steps(id);} approvals(id:string){return this.runs.approvals(id);}
+  async create(taskId:string){const task=await this.tasks.get(taskId);if(!task.projectId)throw new Error("Assign the task to a project before creating a run");await this.projects.get(task.projectId);const run=await this.runs.create(taskId,task.projectId);const available=await this.roles.list(task.projectId);for(const [ordinal,stage] of stages.entries()){const slug=roleForStage[stage];const role=slug?available.find(value=>value.slug===slug&&value.enabled):null;if(slug&&!role)throw new Error(`No enabled ${slug} role is available`);const effective=role?await this.instructions.effective(role.id):null;await this.runs.addStep(run.id,ordinal,stage,role?.id??null,effective?{promptVersion:effective.prompt.version,content:effective.content,contentHash:effective.contentHash,skills:effective.skills.map(skill=>({id:skill.id,version:skill.version,contentHash:skill.contentHash})),warnings:effective.warnings}:null);}const approval=await this.runs.requestApproval(run.id,"start","Review the exact roles, prompts, skills, and permissions before execution starts.");await this.runs.setState(run.id,"awaiting_approval",null);return{run:await this.runs.get(run.id),approval};}
+  async decide(approvalId:string,approved:boolean){const run=await this.runs.decide(approvalId,approved);return approved?this.runs.setState(run.id,"running","plan"):this.runs.setState(run.id,"cancelled",null,"Developer rejected approval");}
+  async request(runId:string,kind:ApprovalKind,detail:string){const run=await this.runs.get(runId);const approval=await this.runs.requestApproval(runId,kind,detail);await this.runs.setState(runId,"awaiting_approval",run.currentStage);return approval;}
+  pause(id:string){return this.runs.setState(id,"paused",null);} cancel(id:string){return this.runs.setState(id,"cancelled",null);}
+}
