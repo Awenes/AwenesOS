@@ -96,6 +96,8 @@ export class WorkflowService {
         null,
         `Developer rejected ${decision.approval.kind} approval`,
       );
+    if (decision.approval.kind === "completion")
+      return this.runs.setState(decision.run.id, "completed", null);
     const stage =
       decision.approval.kind === "start" ? "plan" : decision.run.currentStage;
     return this.runs.setState(decision.run.id, "running", stage);

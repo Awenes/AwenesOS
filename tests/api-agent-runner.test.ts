@@ -27,6 +27,8 @@ const input = {
   stage: "implement",
   worktreePath: "C:\\work",
   timeoutSeconds: 30,
+  maxTurns: 3,
+  capabilities: ["code" as const],
 };
 describe("ApiAgentRunner", () => {
   it("executes provider tool calls through the local constrained host", async () => {
@@ -78,5 +80,36 @@ describe("ApiAgentRunner", () => {
       { id: "1", name: "read_file", arguments: { path: "src/a.ts" } },
     ]);
     expect(result).toMatchObject({ success: true, summary: "Verified" });
+  });
+  it("stops at the configured role turn limit", async () => {
+    const host: AgentToolHost = { execute: async () => "contents" };
+    const fakeFetch = async () =>
+      new Response(
+        JSON.stringify({
+          output: [
+            {
+              type: "function_call",
+              call_id: "1",
+              name: "read_file",
+              arguments: '{"path":"src/a.ts"}',
+            },
+          ],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    const vault: SecretVault = {
+      set: async () => {},
+      get: async () => "key",
+      delete: async () => {},
+    };
+    const result = await new ApiAgentRunner(
+      vault,
+      () => host,
+      fakeFetch as typeof fetch,
+    ).run({ ...input, maxTurns: 1 });
+    expect(result).toMatchObject({
+      success: false,
+      summary: "Agent exceeded the 1-turn tool limit",
+    });
   });
 });

@@ -1,4 +1,5 @@
 import type { ProviderConnection } from "./provider.js";
+import type { AgentCapability } from "./agent-role.js";
 export interface AgentRunRequest {
   provider: ProviderConnection;
   modelId: string;
@@ -8,6 +9,8 @@ export interface AgentRunRequest {
   stage: string;
   worktreePath: string;
   timeoutSeconds: number;
+  maxTurns: number;
+  capabilities: AgentCapability[];
 }
 export interface AgentRunResult {
   success: boolean;

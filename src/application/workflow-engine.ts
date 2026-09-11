@@ -7,6 +7,7 @@ import type { ProviderRepository } from "../infrastructure/repositories/provider
 import type { TaskRepository } from "../infrastructure/repositories/task-repository.js";
 import type { WorkflowRepository } from "../infrastructure/repositories/workflow-repository.js";
 import type { WorktreeService } from "./worktree-service.js";
+import { ExecutionGuard } from "./execution-guard.js";
 export interface AgentRunnerFactory {
   create(
     provider: ProviderConnection,
@@ -35,6 +36,12 @@ export class WorkflowEngine {
     if (!step) return this.runs.setState(runId, "completed", null);
     if (step.stage === "delivery") {
       const project = await this.projects.get(run.projectId);
+      const policy = await this.projects.executionPolicy(run.projectId);
+      if (
+        project.completionPolicy === "auto_push" &&
+        !policy.requirePushApproval
+      )
+        return this.runs.setState(runId, "running", "delivery");
       const kind =
         project.completionPolicy === "manual" ? "completion" : "push";
       await this.runs.requestApproval(
@@ -62,8 +69,10 @@ export class WorkflowEngine {
       );
     }
     const task = await this.tasks.get(run.taskId);
-    const worktree = await this.worktrees.create(task.id);
+    const project = await this.projects.get(run.projectId);
     const policy = await this.projects.executionPolicy(run.projectId);
+    new ExecutionGuard(project.repositoryRoot, policy).assertNetwork("public");
+    const worktree = await this.worktrees.create(task.id);
     const snapshot = step.instructionSnapshot as { content?: string } | null;
     await this.runs.startStep(step.id);
     try {
@@ -76,6 +85,8 @@ export class WorkflowEngine {
         stage: step.stage,
         worktreePath: worktree.path,
         timeoutSeconds: role.limits.timeoutSeconds,
+        maxTurns: role.limits.maxTurns,
+        capabilities: role.capabilities,
       });
       await this.runs.finishStep(
         step.id,

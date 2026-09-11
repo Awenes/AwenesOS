@@ -123,7 +123,7 @@ async function start() {
       tasks,
       new LocalWorktreeDriver(),
     ),
-    notificationService = new NotificationService(tasks),
+    notificationService = new NotificationService(tasks, runs),
     gitService = new GitDeliveryService(
       deliveries,
       runs,
@@ -136,7 +136,8 @@ async function start() {
       return provider.authMethod === "api_key"
         ? new ApiAgentRunner(
             vault,
-            (root) => new WorktreeToolHost(root, policy, commands),
+            (root, capabilities) =>
+              new WorktreeToolHost(root, policy, commands, capabilities),
           )
         : new CliAgentRunner(commands);
     },
@@ -487,9 +488,21 @@ function registerIpc(window: BrowserWindow, s: Services) {
         action: z.enum(["next", "pause", "resume", "cancel"]),
       })
       .parse(input);
-    if (value.action === "next")
-      await s.workflowEngine.executeNext(value.runId);
-    else await s.workflowService[value.action](value.runId);
+    if (value.action === "next") {
+      const result = await s.workflowEngine.executeNext(value.runId);
+      if (result.status === "running" && result.currentStage === "delivery") {
+        const project = await s.projects.get(result.projectId);
+        const policy = await s.projects.executionPolicy(result.projectId);
+        if (
+          project.completionPolicy === "auto_push" &&
+          !policy.requirePushApproval
+        ) {
+          const { task } = await s.taskService.taskSummary(result.taskId);
+          await s.gitService.commit(result.id, `feat: complete ${task.title}`);
+          await s.gitService.push(result.id);
+        }
+      }
+    } else await s.workflowService[value.action](value.runId);
   });
   handle("awenes:approval:decide", async (input) => {
     const value = z

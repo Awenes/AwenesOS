@@ -24,6 +24,14 @@ describe("WorkflowEngine", () => {
       defaultBranch: "main",
       completionPolicy: "manual",
     });
+    await projects.saveExecutionPolicy(project.id, {
+      networkAccess: "public",
+      environmentAllowlist: [],
+      commandAllowlist: ["codex"],
+      processTimeoutSeconds: 900,
+      requirePushApproval: true,
+      isolatedBrowserProfile: true,
+    });
     const task = await tasks.create({
       title: "Fix",
       source: "manual",

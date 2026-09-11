@@ -43,6 +43,14 @@ export function App() {
   useEffect(() => {
     void refresh();
   }, []);
+  useEffect(() => {
+    const rejected = (event: PromiseRejectionEvent) => {
+      event.preventDefault();
+      setError(message(event.reason));
+    };
+    window.addEventListener("unhandledrejection", rejected);
+    return () => window.removeEventListener("unhandledrejection", rejected);
+  }, []);
   const active = snapshot.tasks.filter((task) =>
     [
       "planned",

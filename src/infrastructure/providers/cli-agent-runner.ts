@@ -11,13 +11,14 @@ export class CliAgentRunner implements AgentRunner {
       throw new Error("CLI provider is not configured");
     const prompt = `${input.instructions}\n\n## Assigned task\n${input.taskTitle}\n${input.taskDescription}\n\n## Stage\n${input.stage}\nWork only inside the assigned worktree. End with a concise summary and verification evidence.`;
     const openai = input.provider.kind === "openai";
+    const canWrite = input.capabilities.includes("code");
     const args = openai
       ? [
           "exec",
           "--model",
           input.modelId,
           "--sandbox",
-          "workspace-write",
+          canWrite ? "workspace-write" : "read-only",
           "--ephemeral",
           "--json",
           "-",
@@ -29,7 +30,7 @@ export class CliAgentRunner implements AgentRunner {
           "--output-format",
           "json",
           "--permission-mode",
-          "acceptEdits",
+          canWrite ? "acceptEdits" : "plan",
         ];
     const result = await this.command.execute({
       command: input.provider.command,
@@ -37,6 +38,7 @@ export class CliAgentRunner implements AgentRunner {
       cwd: input.worktreePath,
       network: "public",
       stdin: prompt,
+      timeoutSeconds: input.timeoutSeconds,
     });
     const transcript = [result.stdout, result.stderr]
       .filter(Boolean)

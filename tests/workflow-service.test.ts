@@ -66,6 +66,14 @@ describe("WorkflowService", () => {
     expect(
       (await runs.history(created.run.id)).map((event) => event.type),
     ).toContain("approval.approved");
+    const completion = await service.request(
+      created.run.id,
+      "completion",
+      "Review evidence",
+    );
+    expect((await service.decide(completion.id, true)).status).toBe(
+      "completed",
+    );
     opened.client.close();
   });
 });

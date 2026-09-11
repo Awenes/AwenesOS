@@ -81,10 +81,14 @@ export class GuardedCommandExecutor implements ManagedCommandExecutor {
       });
       if (input.stdin) child.stdin.write(input.stdin);
       child.stdin.end();
+      const timeoutSeconds = Math.min(
+        input.timeoutSeconds ?? this.policy.processTimeoutSeconds,
+        this.policy.processTimeoutSeconds,
+      );
       const timer = setTimeout(async () => {
         timedOut = true;
         await terminateTree(child.pid);
-      }, this.policy.processTimeoutSeconds * 1000);
+      }, timeoutSeconds * 1000);
     });
   }
   private environment(network: ExecutionRequest["network"]) {

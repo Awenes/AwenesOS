@@ -5,6 +5,7 @@ export const ExecutionRequestSchema = z.object({
   cwd: z.string().trim().min(1),
   network: z.enum(["none", "localhost", "public"]).default("none"),
   stdin: z.string().max(2_000_000).optional(),
+  timeoutSeconds: z.number().int().min(1).max(7200).optional(),
 });
 export type ExecutionRequest = z.infer<typeof ExecutionRequestSchema>;
 export interface ExecutionResult {

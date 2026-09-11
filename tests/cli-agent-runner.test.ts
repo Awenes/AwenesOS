@@ -41,12 +41,15 @@ describe("CliAgentRunner", () => {
       stage: "implement",
       worktreePath: "C:\\work",
       timeoutSeconds: 60,
+      maxTurns: 4,
+      capabilities: ["code"],
     });
     expect(result.success).toBe(true);
     expect(seen).toMatchObject({
       command: "codex",
       cwd: "C:\\work",
       network: "public",
+      timeoutSeconds: 60,
     });
     expect(seen?.args).toContain("workspace-write");
     expect(seen?.stdin).toContain("Assigned task");

@@ -5,12 +5,14 @@ import { ExecutionGuard } from "../../application/execution-guard.js";
 import type { AgentToolCall, AgentToolHost } from "../../domain/agent-tools.js";
 import type { CommandExecutor } from "../../domain/execution.js";
 import type { ExecutionPolicy } from "../../domain/project.js";
+import type { AgentCapability } from "../../domain/agent-role.js";
 export class WorktreeToolHost implements AgentToolHost {
   private guard: ExecutionGuard;
   constructor(
     private root: string,
     policy: ExecutionPolicy,
     private commands: CommandExecutor,
+    private capabilities: AgentCapability[],
   ) {
     this.guard = new ExecutionGuard(root, policy);
   }
@@ -26,6 +28,7 @@ export class WorktreeToolHost implements AgentToolHost {
         );
       }
       case "write_file": {
+        this.requireCapability("code", "write files");
         const value = z
           .object({ path: z.string(), content: z.string().max(2_000_000) })
           .parse(call.arguments);
@@ -35,6 +38,12 @@ export class WorktreeToolHost implements AgentToolHost {
         return `Wrote ${value.content.length} characters to ${value.path}`;
       }
       case "run_command": {
+        if (
+          !this.capabilities.some((value) =>
+            ["code", "test", "review", "browser"].includes(value),
+          )
+        )
+          throw new Error("This agent role is not allowed to run commands");
         const value = z
           .object({
             command: z.string(),
@@ -51,6 +60,12 @@ export class WorktreeToolHost implements AgentToolHost {
       default:
         throw new Error(`Unknown agent tool: ${(call as AgentToolCall).name}`);
     }
+  }
+  private requireCapability(capability: AgentCapability, action: string) {
+    if (!this.capabilities.includes(capability))
+      throw new Error(
+        `This agent role requires the ${capability} capability to ${action}`,
+      );
   }
 }
 async function walk(root: string) {

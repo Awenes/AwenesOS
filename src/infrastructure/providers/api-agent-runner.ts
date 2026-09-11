@@ -4,12 +4,16 @@ import type {
 } from "../../domain/agent-runner.js";
 import type { AgentToolCall, AgentToolHost } from "../../domain/agent-tools.js";
 import type { SecretVault } from "../../domain/provider.js";
+import type { AgentCapability } from "../../domain/agent-role.js";
 type Fetch = typeof fetch;
 
 export class ApiAgentRunner implements AgentRunner {
   constructor(
     private vault: SecretVault,
-    private tools: (root: string) => AgentToolHost,
+    private tools: (
+      root: string,
+      capabilities: AgentCapability[],
+    ) => AgentToolHost,
     private request: Fetch = fetch,
   ) {}
   async run(input: AgentRunRequest) {
@@ -22,6 +26,7 @@ export class ApiAgentRunner implements AgentRunner {
       : this.anthropic(input, key);
   }
   private async openai(input: AgentRunRequest, key: string) {
+    const deadline = Date.now() + input.timeoutSeconds * 1000;
     let items: any[] = [
       { role: "developer", content: input.instructions },
       {
@@ -30,16 +35,17 @@ export class ApiAgentRunner implements AgentRunner {
       },
     ];
     let transcript = "";
-    for (let turn = 0; turn < 50; turn++) {
+    for (let turn = 0; turn < input.maxTurns; turn++) {
       const response = await this.json(
         "https://api.openai.com/v1/responses",
         {
           model: input.modelId,
           input: items,
-          tools: definitions("openai"),
+          tools: definitions("openai", input.capabilities),
           store: false,
         },
         { authorization: `Bearer ${key}` },
+        deadline,
       );
       const calls = (response.output ?? []).filter(
         (item: any) => item.type === "function_call",
@@ -53,20 +59,22 @@ export class ApiAgentRunner implements AgentRunner {
         calls.map(async (call: any) => ({
           type: "function_call_output",
           call_id: call.call_id,
-          output: await this.tools(input.worktreePath).execute(
-            parseCall(call.call_id, call.name, call.arguments),
-          ),
+          output: await this.tools(
+            input.worktreePath,
+            input.capabilities,
+          ).execute(parseCall(call.call_id, call.name, call.arguments)),
         })),
       );
       items = [...items, ...(response.output ?? []), ...outputs];
     }
     return {
       success: false,
-      summary: "Agent exceeded the 50-turn tool limit",
+      summary: `Agent exceeded the ${input.maxTurns}-turn tool limit`,
       transcript,
     };
   }
   private async anthropic(input: AgentRunRequest, key: string) {
+    const deadline = Date.now() + input.timeoutSeconds * 1000;
     const messages: any[] = [
       {
         role: "user",
@@ -74,16 +82,17 @@ export class ApiAgentRunner implements AgentRunner {
       },
     ];
     let transcript = "";
-    for (let turn = 0; turn < 50; turn++) {
+    for (let turn = 0; turn < input.maxTurns; turn++) {
       const response = await this.json(
         "https://api.anthropic.com/v1/messages",
         {
           model: input.modelId,
           max_tokens: 8192,
           messages,
-          tools: definitions("anthropic"),
+          tools: definitions("anthropic", input.capabilities),
         },
         { "x-api-key": key, "anthropic-version": "2023-06-01" },
+        deadline,
       );
       const calls = (response.content ?? []).filter(
         (item: any) => item.type === "tool_use",
@@ -103,7 +112,10 @@ export class ApiAgentRunner implements AgentRunner {
             calls.map(async (call: any) => ({
               type: "tool_result",
               tool_use_id: call.id,
-              content: await this.tools(input.worktreePath).execute({
+              content: await this.tools(
+                input.worktreePath,
+                input.capabilities,
+              ).execute({
                 id: call.id,
                 name: call.name,
                 arguments: call.input,
@@ -115,7 +127,7 @@ export class ApiAgentRunner implements AgentRunner {
     }
     return {
       success: false,
-      summary: "Agent exceeded the 50-turn tool limit",
+      summary: `Agent exceeded the ${input.maxTurns}-turn tool limit`,
       transcript,
     };
   }
@@ -123,12 +135,15 @@ export class ApiAgentRunner implements AgentRunner {
     url: string,
     body: unknown,
     headers: Record<string, string>,
+    deadline: number,
   ) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error("Agent exceeded its time limit");
     const response = await this.request(url, {
       method: "POST",
       headers: { "content-type": "application/json", ...headers },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(Math.min(120_000, remaining)),
     });
     if (!response.ok)
       throw new Error(
@@ -147,7 +162,10 @@ function extractOpenAiText(output: any[]) {
     .map((item) => item.text)
     .join("\n");
 }
-function definitions(kind: "openai" | "anthropic") {
+function definitions(
+  kind: "openai" | "anthropic",
+  capabilities: AgentCapability[],
+) {
   const tools = [
     {
       name: "list_files",
@@ -192,7 +210,17 @@ function definitions(kind: "openai" | "anthropic") {
         additionalProperties: false,
       },
     },
-  ];
+  ]
+    .filter(
+      (tool) => tool.name !== "write_file" || capabilities.includes("code"),
+    )
+    .filter(
+      (tool) =>
+        tool.name !== "run_command" ||
+        capabilities.some((value) =>
+          ["code", "test", "review", "browser"].includes(value),
+        ),
+    );
   return kind === "anthropic"
     ? tools
     : tools.map(({ input_schema, ...tool }) => ({
