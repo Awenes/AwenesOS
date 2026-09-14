@@ -1,10 +1,10 @@
-import { and, asc, desc, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { CrmTaskMapping } from "../../domain/crm.js";
 import type { CaptureTask, EvidenceKind, Task, TaskStatus } from "../../domain/task.js";
 import type { NotificationPreference } from "../../domain/notification.js";
 import type { Database } from "../db/database.js";
-import { crmMappings, evidence, manualCrmUpdates, notificationPreferences, taskEvents, taskRepositories, tasks, trackerUpdates } from "../db/schema.js";
+import { crmMappings, evidence, manualCrmUpdates, notificationPreferences, taskEvents, taskRepositories, tasks, taskTombstones, trackerUpdates } from "../db/schema.js";
 
 export interface ManualTrackerUpdate {
   id: string;
@@ -45,12 +45,47 @@ export class TaskRepository {
   }
 
   async list(statuses?: TaskStatus[]): Promise<Task[]> {
-    const rows = await this.db.select().from(tasks).where(statuses?.length ? inArray(tasks.status, statuses) : undefined).orderBy(desc(tasks.updatedAt));
+    const rows = await this.db.select().from(tasks).where(and(isNull(tasks.archivedAt), isNull(tasks.deletedAt), statuses?.length ? inArray(tasks.status, statuses) : undefined)).orderBy(desc(tasks.updatedAt));
     return rows as Task[];
   }
 
   async listForProject(projectId: string): Promise<Task[]> {
-    return await this.db.select().from(tasks).where(eq(tasks.projectId, projectId)).orderBy(desc(tasks.updatedAt)) as Task[];
+    return await this.db.select().from(tasks).where(and(eq(tasks.projectId, projectId), isNull(tasks.archivedAt), isNull(tasks.deletedAt))).orderBy(desc(tasks.updatedAt)) as Task[];
+  }
+
+  async archived(): Promise<Task[]> {
+    return await this.db.select().from(tasks).where(and(isNull(tasks.deletedAt), isNotNull(tasks.archivedAt))).orderBy(desc(tasks.archivedAt)) as Task[];
+  }
+
+  async archive(id: string): Promise<Task> {
+    const task = await this.get(id);
+    if (["in_progress", "sync_pending"].includes(task.status)) throw new Error("Active work must be paused or finished before it can be archived");
+    if (task.deletedAt) throw new Error("A deleted task cannot be archived");
+    if (task.archivedAt) return task;
+    const now = new Date();
+    await this.db.update(tasks).set({ archivedAt: now, updatedAt: now }).where(eq(tasks.id, id));
+    await this.event(id, "task.archived", {}, now);
+    return this.get(id);
+  }
+
+  async restore(id: string): Promise<Task> {
+    const task = await this.get(id);
+    if (task.deletedAt) throw new Error("A deleted task cannot be restored");
+    if (!task.archivedAt) return task;
+    const now = new Date();
+    await this.db.update(tasks).set({ archivedAt: null, updatedAt: now }).where(eq(tasks.id, id));
+    await this.event(id, "task.restored", {}, now);
+    return this.get(id);
+  }
+
+  async delete(id: string): Promise<void> {
+    const task = await this.get(id);
+    if (["in_progress", "sync_pending"].includes(task.status)) throw new Error("Active work must be paused or finished before it can be deleted");
+    if (task.deletedAt) return;
+    const now = new Date();
+    await this.event(id, "task.deleted", {}, now);
+    await this.db.update(tasks).set({ deletedAt: now, archivedAt: null, updatedAt: now }).where(eq(tasks.id, id));
+    await this.db.insert(taskTombstones).values({ taskId: id, deletedAt: now }).onConflictDoNothing();
   }
 
   async findBySourceReference(sourceReference: string): Promise<Task | null> {

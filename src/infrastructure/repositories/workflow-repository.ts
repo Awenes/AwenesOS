@@ -1,16 +1,21 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import type {
   Approval,
   ApprovalKind,
   WorkflowRun,
   WorkflowStage,
   WorkflowStep,
+  WorkflowPlan,
+  WorkflowIntervention,
+  InterventionKind,
 } from "../../domain/workflow.js";
 import type { Database } from "../db/database.js";
 import {
   workflowApprovals,
   workflowEvents,
+  workflowInterventions,
+  workflowPlans,
   workflowRuns,
   workflowSteps,
 } from "../db/schema.js";
@@ -152,6 +157,74 @@ export class WorkflowRepository {
       .from(workflowApprovals)
       .where(eq(workflowApprovals.runId, runId))
       .orderBy(asc(workflowApprovals.requestedAt));
+  }
+  async createPlan(runId: string, content: string, requiresApproval = true) {
+    await this.get(runId);
+    const latest = await this.db
+      .select()
+      .from(workflowPlans)
+      .where(eq(workflowPlans.runId, runId))
+      .orderBy(desc(workflowPlans.version))
+      .limit(1);
+    const now = new Date();
+    const plan: WorkflowPlan = {
+      id: randomUUID(),
+      runId,
+      version: (latest[0]?.version ?? 0) + 1,
+      content: content.trim(),
+      status: requiresApproval ? "awaiting_approval" : "approved",
+      createdAt: now,
+      decidedAt: requiresApproval ? null : now,
+    };
+    if (!plan.content) throw new Error("A workflow plan cannot be empty");
+    await this.db.insert(workflowPlans).values(plan);
+    await this.event(runId, "plan.created", { planId: plan.id, version: plan.version, status: plan.status }, now);
+    return plan;
+  }
+  plans(runId: string): Promise<WorkflowPlan[]> {
+    return this.db.select().from(workflowPlans).where(eq(workflowPlans.runId, runId)).orderBy(desc(workflowPlans.version)) as Promise<WorkflowPlan[]>;
+  }
+  async decidePlan(id: string, decision: "approved" | "changes_requested") {
+    const current = await this.db.query.workflowPlans.findFirst({ where: eq(workflowPlans.id, id) });
+    if (!current || current.status !== "awaiting_approval") throw new Error("Plan awaiting approval not found");
+    const decidedAt = new Date();
+    await this.db.update(workflowPlans).set({ status: decision, decidedAt }).where(eq(workflowPlans.id, id));
+    await this.event(current.runId, `plan.${decision}`, { planId: id, version: current.version }, decidedAt);
+    return { ...current, status: decision, decidedAt } as WorkflowPlan;
+  }
+  async openIntervention(runId: string, kind: InterventionKind, title: string, detail: string) {
+    await this.get(runId);
+    const now = new Date();
+    const intervention: WorkflowIntervention = { id: randomUUID(), runId, kind, title: title.trim(), detail: detail.trim(), status: "open", createdAt: now, resolvedAt: null };
+    if (!intervention.title || !intervention.detail) throw new Error("An intervention needs a title and detail");
+    await this.db.insert(workflowInterventions).values(intervention);
+    await this.event(runId, "intervention.opened", { interventionId: intervention.id, kind }, now);
+    return intervention;
+  }
+  interventions(runId: string, openOnly = false): Promise<WorkflowIntervention[]> {
+    return this.db.select().from(workflowInterventions).where(and(eq(workflowInterventions.runId, runId), openOnly ? eq(workflowInterventions.status, "open") : undefined)).orderBy(asc(workflowInterventions.createdAt)) as Promise<WorkflowIntervention[]>;
+  }
+  async resolveIntervention(id: string) {
+    const current = await this.db.query.workflowInterventions.findFirst({ where: eq(workflowInterventions.id, id) });
+    if (!current || current.status !== "open") throw new Error("Open intervention not found");
+    const resolvedAt = new Date();
+    await this.db.update(workflowInterventions).set({ status: "resolved", resolvedAt }).where(eq(workflowInterventions.id, id));
+    await this.event(current.runId, "intervention.resolved", { interventionId: id }, resolvedAt);
+    return { ...current, status: "resolved", resolvedAt } as WorkflowIntervention;
+  }
+  async acquireLease(runId: string, owner: string, ttlMs: number, now = new Date()) {
+    if (!owner.trim() || ttlMs < 1_000) throw new Error("A lease needs an owner and a duration of at least one second");
+    const expiresAt = new Date(now.getTime() + ttlMs);
+    const changed = await this.db.update(workflowRuns).set({ leaseOwner: owner, leaseExpiresAt: expiresAt, updatedAt: now }).where(and(eq(workflowRuns.id, runId), or(isNull(workflowRuns.leaseExpiresAt), lt(workflowRuns.leaseExpiresAt, now), eq(workflowRuns.leaseOwner, owner)))).returning();
+    if (!changed[0]) return false;
+    await this.event(runId, "workflow.lease_acquired", { owner, expiresAt: expiresAt.toISOString() }, now);
+    return true;
+  }
+  async releaseLease(runId: string, owner: string, now = new Date()) {
+    const changed = await this.db.update(workflowRuns).set({ leaseOwner: null, leaseExpiresAt: null, updatedAt: now }).where(and(eq(workflowRuns.id, runId), eq(workflowRuns.leaseOwner, owner))).returning();
+    if (!changed[0]) return false;
+    await this.event(runId, "workflow.lease_released", { owner }, now);
+    return true;
   }
   async approval(id: string) {
     const row = await this.db.query.workflowApprovals.findFirst({
