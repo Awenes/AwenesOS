@@ -1,21 +1,34 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { ProviderConnection, ProviderProbe } from "../../domain/provider.js";
+import type { ProviderConnection, ProviderProbe, ProviderProbeResult } from "../../domain/provider.js";
+import { LocalProviderCommandLocator, type ProviderCommandLocator } from "./local-provider-command.js";
 
 const execute = promisify(execFile);
+type ExecuteCommand = (
+  command: string,
+  args: string[],
+  options: { timeout: number; windowsHide: boolean; env: NodeJS.ProcessEnv },
+) => Promise<{ stdout: string; stderr: string }>;
 
 export class LocalProviderProbe implements ProviderProbe {
-  async check(connection: ProviderConnection, secret: string | null): Promise<{ ready: boolean; detail: string }> {
+  constructor(
+    private readonly locator: ProviderCommandLocator = new LocalProviderCommandLocator(),
+    private readonly executeCommand: ExecuteCommand = async (command, args, options) => execute(command, args, options),
+  ) {}
+
+  async check(connection: ProviderConnection, secret: string | null): Promise<ProviderProbeResult> {
+    let resolvedCommand = connection.command ?? "";
     try {
       if (connection.authMethod === "api_key") return await checkApi(connection, secret);
       const expected = connection.kind === "openai" ? "codex" : "claude";
-      const command = connection.command?.replace(/\.(?:cmd|exe|bat)$/i, "").split(/[\\/]/).at(-1)?.toLowerCase();
+      resolvedCommand = await this.locator.resolve(connection.kind, connection.command!);
+      const command = resolvedCommand.replace(/\.(?:cmd|exe|bat)$/i, "").split(/[\\/]/).at(-1)?.toLowerCase();
       if (command !== expected) return { ready: false, detail: `${connection.kind} CLI connections must use ${expected}` };
       const args = connection.kind === "openai" ? ["login", "status"] : ["auth", "status"];
-      await execute(connection.command!, args, { timeout: 15_000, windowsHide: true, env: minimalPathEnvironment() });
-      return { ready: true, detail: `${expected} is installed and signed in` };
+      await this.executeCommand(resolvedCommand, args, { timeout: 15_000, windowsHide: true, env: minimalPathEnvironment() });
+      return { ready: true, detail: `${expected} is installed and signed in`, resolvedCommand };
     } catch (error) {
-      return { ready: false, detail: cliFailureDetail(connection, error) };
+      return { ready: false, detail: cliFailureDetail(connection, error), ...(resolvedCommand ? { resolvedCommand } : {}) };
     }
   }
 }
@@ -38,6 +51,9 @@ function cliFailureDetail(connection: ProviderConnection, error: unknown): strin
   ]
     .find((value) => typeof value === "string" && value.trim())
     ?.trim();
+  if (output && /not logged in|not signed in|not authenticated|login required/i.test(output)) {
+    return `${provider} CLI is installed but not signed in. Sign in with ${command}, then try verification again.`;
+  }
   return `${provider} CLI is installed, but AwenesOS could not verify its login. Sign in with the CLI, then try again${output ? `: ${output}` : "."}`;
 }
 

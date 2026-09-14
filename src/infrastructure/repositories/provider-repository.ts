@@ -29,6 +29,14 @@ export class ProviderRepository {
     await this.event(id, status === "ready" ? "provider.ready" : "provider.check_failed", { error }, now);
     return this.get(id);
   }
+  async updateCommand(id: string, command: string): Promise<ProviderConnection> {
+    const current = await this.get(id);
+    if (current.command === command) return current;
+    const now = new Date();
+    await this.db.update(providerConnections).set({ command, updatedAt: now }).where(eq(providerConnections.id, id));
+    await this.event(id, "provider.command_resolved", { command }, now);
+    return this.get(id);
+  }
 
   async remove(id: string): Promise<void> {
     await this.get(id); const now = new Date();

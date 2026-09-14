@@ -203,9 +203,9 @@ function Providers({
                   />
                 </label>
                 <small>
-                  Keep the default unless AwenesOS says it cannot find the
-                  provider program. In that case, browse Windows for the
-                  executable and paste its complete location here.
+                  Keep the default. AwenesOS searches your Windows PATH and
+                  supported Codex or Claude installation folders automatically.
+                  Enter a complete executable path only for a custom installation.
                 </small>
               </details>
             </>

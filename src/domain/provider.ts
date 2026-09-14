@@ -36,5 +36,6 @@ export interface SecretVault {
 }
 
 export interface ProviderProbe {
-  check(connection: ProviderConnection, secret: string | null): Promise<{ ready: boolean; detail: string }>;
+  check(connection: ProviderConnection, secret: string | null): Promise<ProviderProbeResult>;
 }
+export interface ProviderProbeResult { ready: boolean; detail: string; resolvedCommand?: string; }

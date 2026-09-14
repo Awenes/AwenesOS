@@ -24,6 +24,8 @@ export class ProviderService {
     const connection = await this.repository.get(id);
     const secret = connection.authMethod === "api_key" ? await this.vault.get(secretKey(id)) : null;
     const result = await this.probe.check(connection, secret);
+    if (connection.authMethod === "cli" && result.resolvedCommand && result.resolvedCommand !== connection.command)
+      await this.repository.updateCommand(id, result.resolvedCommand);
     return this.repository.recordCheck(id, result.ready ? "ready" : "error", result.ready ? null : result.detail);
   }
 

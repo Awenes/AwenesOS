@@ -16,6 +16,10 @@ class FakeProbe implements ProviderProbe {
   async check(_connection: ProviderConnection, secret: string | null) { this.seenSecret = secret; return { ready: Boolean(secret), detail: secret ? "Ready" : "Missing credentials" }; }
 }
 
+class ResolvedCliProbe implements ProviderProbe {
+  async check() { return { ready: false, detail: "Sign in", resolvedCommand: "C:\\tools\\codex.exe" }; }
+}
+
 describe("ProviderService", () => {
   it("stores API credentials outside SQLite and records verification events", async () => {
     const opened = await openDatabase(":memory:"); const repository = new ProviderRepository(opened.db); const vault = new MemoryVault(); const probe = new FakeProbe();
@@ -34,6 +38,20 @@ describe("ProviderService", () => {
     await service.remove(provider.id);
     expect((await repository.get(provider.id)).status).toBe("disconnected");
     expect((await repository.history(provider.id)).at(-1)?.type).toBe("provider.removed");
+    opened.client.close();
+  });
+
+  it("persists a discovered CLI path even when sign-in is still required", async () => {
+    const opened = await openDatabase(":memory:");
+    const repository = new ProviderRepository(opened.db);
+    const service = new ProviderService(repository, new MemoryVault(), new ResolvedCliProbe());
+    const provider = await service.connect({ name: "Codex", kind: "openai", authMethod: "cli", command: "codex", models: [] });
+    expect(provider).toMatchObject({ status: "error", command: "C:\\tools\\codex.exe", error: "Sign in" });
+    expect((await repository.history(provider.id)).map((event) => event.type)).toEqual([
+      "provider.created",
+      "provider.command_resolved",
+      "provider.check_failed",
+    ]);
     opened.client.close();
   });
 });

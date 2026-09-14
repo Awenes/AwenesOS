@@ -31,4 +31,20 @@ describe("LocalProviderProbe", () => {
     expect(result.detail).toContain("Install Codex CLI and sign in");
     expect(result.detail).not.toMatch(/\bENOENT\b/);
   });
+
+  it("distinguishes an installed CLI from a missing login", async () => {
+    const loginError = Object.assign(new Error("Command failed"), { stderr: "Not logged in" });
+    const probe = new LocalProviderProbe(
+      { resolve: async () => "C:\\tools\\codex.exe" },
+      async () => { throw loginError; },
+    );
+    const result = await probe.check(connection("codex"), null);
+
+    expect(result).toMatchObject({
+      ready: false,
+      resolvedCommand: "C:\\tools\\codex.exe",
+    });
+    expect(result.detail).toContain("installed but not signed in");
+    expect(result.detail).not.toContain("was not found");
+  });
 });
