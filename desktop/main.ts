@@ -637,6 +637,7 @@ function registerIpc(window: BrowserWindow, s: Services) {
 }
 
 const automaticRuns = new Set<string>();
+const executionOwner = `desktop:${process.pid}`;
 async function assignUnconfiguredRoles(
   roles: AgentRoleService,
   providers: ProviderService,
@@ -655,17 +656,20 @@ async function assignUnconfiguredRoles(
 
 async function runAutomatically(runId: string, services: Services) {
   if (automaticRuns.has(runId)) return;
+  if (!(await services.workflowService.acquireExecution(runId, executionOwner))) return;
   automaticRuns.add(runId);
   try {
     for (;;) {
       const run = await services.workflowService.get(runId);
       if (run.status !== "running") return;
+      if (!(await services.workflowService.acquireExecution(runId, executionOwner))) return;
       await services.workflowEngine.executeNext(runId);
     }
   } catch (error) {
     await services.workflowService.fail(runId, error);
   } finally {
     automaticRuns.delete(runId);
+    await services.workflowService.releaseExecution(runId, executionOwner);
   }
 }
 function contentType(path: string) {

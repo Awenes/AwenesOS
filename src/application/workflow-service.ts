@@ -48,6 +48,12 @@ export class WorkflowService {
   recoverInterrupted() {
     return this.runs.recoverInterrupted();
   }
+  acquireExecution(id: string, owner: string, ttlMs = 60_000) {
+    return this.runs.acquireLease(id, owner, ttlMs);
+  }
+  releaseExecution(id: string, owner: string) {
+    return this.runs.releaseLease(id, owner);
+  }
   async create(taskId: string) {
     const task = await this.tasks.get(taskId);
     if (!task.projectId)
