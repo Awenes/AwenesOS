@@ -25,6 +25,7 @@ export function App() {
   );
   return (
     <div className="shell" aria-busy={loading || pendingOperations > 0}>
+      <a className="skip-link" href="#main-content">Skip to main content</a>
       <ActivityIndicator visible={loading || pendingOperations > 0} />
       <Toast value={toast} dismiss={dismissToast} />
       <aside className="sidebar">
@@ -35,11 +36,12 @@ export function App() {
             <small>Developer command center</small>
           </div>
         </div>
-        <nav>
+        <nav aria-label="Primary navigation">
           {navigation.map(([id, label]) => (
             <button
               key={id}
               className={view === id ? "active" : ""}
+              aria-current={view === id ? "page" : undefined}
               onClick={() => setView(id)}
             >
               <span>{viewIcon(id)}</span>
@@ -56,7 +58,7 @@ export function App() {
           <small>{snapshot.projects.length} projects connected</small>
         </div>
       </aside>
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <header>
           <div>
             <p className="eyebrow">LOCAL-FIRST WORKSPACE</p>
@@ -69,10 +71,10 @@ export function App() {
           >
             {loading ? "Refreshing…" : "Refresh"}
           </button>
-          <button className="ghost" onClick={() => void window.awenes.exportData()}>Export data</button>
+          <button type="button" className="ghost" onClick={() => void window.awenes.exportData()}>Export data</button>
         </header>
         {error && (
-          <div className="error">
+          <div className="error" role="alert">
             <strong>Something needs attention</strong>
             <span>{error}</span>
           </div>

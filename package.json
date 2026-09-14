@@ -22,6 +22,7 @@
     "package:win": "pnpm build && electron-builder --win nsis",
     "db:generate": "drizzle-kit generate",
     "test": "vitest run",
+    "test:desktop-smoke": "node scripts/desktop-smoke.mjs",
     "test:watch": "vitest"
   },
   "main": "dist-desktop/main/desktop/main.js",

@@ -18,6 +18,8 @@ body {
   min-width: 1040px;
   min-height: 100vh;
 }
+.skip-link { position: fixed; z-index: 2000; top: 8px; left: 8px; transform: translateY(-160%); padding: 9px 12px; border-radius: 8px; background: #f5f7fc; color: #111827; font-weight: 700; }
+.skip-link:focus { transform: translateY(0); }
 .activity {
   position: fixed;
   z-index: 1000;
@@ -892,4 +894,7 @@ textarea:focus-visible,
 summary:focus-visible { outline: 2px solid #a99bff; outline-offset: 2px; }
 @media (max-width: 1250px) {
   .form-grid.three { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }

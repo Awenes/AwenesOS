@@ -1,6 +1,6 @@
 # Workflow and UX overhaul
 
-Status: awaiting visual QA
+Status: awaiting final user acceptance
 
 Rebuild AwenesOS around the developer journey: add a project, start a task, intervene only when needed, review evidence, approve delivery, and confirm external updates.
 
@@ -27,4 +27,4 @@ Rebuild AwenesOS around the developer journey: add a project, start a task, inte
 
 ## Current checkpoint
 
-Checkpoints 1–5 are implemented, along with the checkpoint 6 archive, provider-removal, custom-agent, dashboard, and friendly-export capabilities. Guided onboarding can initialize Git only after explicit consent. One-action task launch uses automatic orchestration, balanced and guided runs pause on readable plans, and the task cockpit presents stages and interventions. Automated validation is green; visual QA is required before final resilience, accessibility, and Windows acceptance testing.
+Checkpoints 1–7 are implemented. The renderer now uses shared components, hooks, presentation utilities, and consistent pagination. Keyboard navigation includes a skip link, current-page semantics, alert announcements, visible focus, and reduced-motion support. The automated Windows Electron smoke test launches against an isolated database and verifies a rendered PNG. Type checks, unit/integration tests, production build, and desktop smoke test are green. Final user acceptance remains.

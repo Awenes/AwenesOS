@@ -99,19 +99,13 @@ Installer:
 release\AwenesOS-Setup-0.1.0.exe
 ```
 
-Expected SHA-256:
-
-```text
-86B086500F5C068278EE042C75C3E5EDCBD9AD63BE288F9F00E8FFAD37D4BD25
-```
-
-Verify it in PowerShell:
+Record and verify the SHA-256 generated for the exact acceptance build:
 
 ```powershell
 Get-FileHash .\release\AwenesOS-Setup-0.1.0.exe -Algorithm SHA256
 ```
 
-Pass when the hash matches exactly. Stop testing and report a release-blocking issue if it does not.
+Pass when the hash remains identical for every tester receiving that acceptance build. Stop testing and report a release-blocking issue if it changes in transit.
 
 ## 6. Create a disposable repository
 
@@ -199,7 +193,7 @@ Expected:
 Negative checks:
 
 - A nonexistent/unreadable path must fail clearly.
-- A directory that is not a Git repository must fail readiness.
+- A directory that is not a Git repository must require the tester to explicitly select **Create a local Git repository**. Without that consent, registration must stop; with it, AwenesOS may initialize Git locally and readiness may proceed.
 - Invalid or empty names and branches must not be accepted.
 
 ### QA-004 — Environment readiness
