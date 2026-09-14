@@ -154,6 +154,7 @@ Physical QA remains mandatory before the Tauri migration.
 - [QA testing guide](docs/qa-testing-guide.md)
 - [Desktop command center](docs/desktop-preview.md)
 - [Architecture](docs/architecture.md)
+- [Coding standards](docs/coding-standards.md)
 - [CLI reference](docs/cli.md)
 - [CRM workflow](docs/crm-adapter.md)
 - [Acceptance checkpoint](.ai/checkpoints/0011-electron-v01-acceptance.md)

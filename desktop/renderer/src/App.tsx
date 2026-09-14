@@ -1,85 +1,19 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import type { DesktopSnapshot } from "../../contracts";
 import type { ExecutionPolicy } from "../../../src/domain/project";
 import {
   PROVIDER_MODELS,
   providerModelName,
 } from "../../../src/domain/provider-model";
-import { paginate } from "../../../src/domain/pagination";
+import { ActivityIndicator, Toast } from "./components/feedback";
+import { Badge, Empty, Guard, Metric, Pagination, Panel } from "./components/ui";
+import { useDesktopState } from "./hooks/use-desktop-state";
+import { usePagination } from "./hooks/use-pagination";
+import { folderName, formatCheckedAt, navigation, pretty, projectName, splitCommaSeparated, splitLines, taskName, type View, viewIcon, viewTitle } from "./utils/presentation";
 
-type View =
-  | "overview"
-  | "projects"
-  | "tasks"
-  | "runs"
-  | "approvals"
-  | "agents"
-  | "providers"
-  | "notifications"
-  | "safety";
-const empty: DesktopSnapshot = {
-  projects: [],
-  tasks: [],
-  archivedTasks: [],
-  roles: [],
-  providers: [],
-  runs: [],
-  approvals: [],
-  notifications: [],
-  pendingCrm: 0,
-  pendingTracker: 0,
-};
 export function App() {
-  const [snapshot, setSnapshot] = useState(empty);
   const [view, setView] = useState<View>("overview");
-  const [loading, setLoading] = useState(true);
-  const [pendingOperations, setPendingOperations] = useState(0);
-  const [error, setError] = useState("");
-  const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
-  const refresh = async (announce = false) => {
-    setLoading(true);
-    try {
-      setSnapshot(await window.awenes.snapshot());
-      setError("");
-      if (announce) setToast({ message: "Everything is up to date", tone: "success" });
-    } catch (cause) {
-      setError(message(cause));
-    } finally {
-      setLoading(false);
-    }
-  };
-  useEffect(() => window.awenes.onActivity(setPendingOperations), []);
-  useEffect(() => window.awenes.onFeedback(setToast), []);
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 3_200);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
-  useEffect(() => {
-    void refresh();
-  }, []);
-  const workflowActive = snapshot.runs.some(
-    (run) => run.status === "running" && run.stepStatus === "running",
-  );
-  useEffect(() => {
-    if (!workflowActive) return;
-    const timer = window.setInterval(async () => {
-      try {
-        setSnapshot(await window.awenes.snapshot());
-      } catch (cause) {
-        setError(message(cause));
-      }
-    }, 1_500);
-    return () => window.clearInterval(timer);
-  }, [workflowActive]);
-  useEffect(() => {
-    const rejected = (event: PromiseRejectionEvent) => {
-      event.preventDefault();
-      setError(message(event.reason));
-    };
-    window.addEventListener("unhandledrejection", rejected);
-    return () => window.removeEventListener("unhandledrejection", rejected);
-  }, []);
+  const { snapshot, loading, pendingOperations, error, toast, dismissToast, refresh } = useDesktopState();
   const active = snapshot.tasks.filter((task) =>
     [
       "planned",
@@ -91,19 +25,8 @@ export function App() {
   );
   return (
     <div className="shell" aria-busy={loading || pendingOperations > 0}>
-      {(loading || pendingOperations > 0) && (
-        <div className="activity" role="status" aria-live="polite">
-          <span className="spinner" />
-          Working…
-        </div>
-      )}
-      {toast && (
-        <div className={`toast ${toast.tone}`} role="status" aria-live="polite">
-          <span>{toast.tone === "success" ? "✓" : "!"}</span>
-          {toast.message}
-          <button aria-label="Dismiss notification" onClick={() => setToast(null)}>×</button>
-        </div>
-      )}
+      <ActivityIndicator visible={loading || pendingOperations > 0} />
+      <Toast value={toast} dismiss={dismissToast} />
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-mark">A</span>
@@ -113,25 +36,13 @@ export function App() {
           </div>
         </div>
         <nav>
-          {(
-            [
-              ["overview", "Overview"],
-              ["projects", "Projects"],
-              ["tasks", "Tasks"],
-              ["runs", "Runs"],
-              ["approvals", "Approvals"],
-              ["agents", "Agents"],
-              ["providers", "Providers"],
-              ["notifications", "Notifications"],
-              ["safety", "Safety"],
-            ] as const
-          ).map(([id, label]) => (
+          {navigation.map(([id, label]) => (
             <button
               key={id}
               className={view === id ? "active" : ""}
               onClick={() => setView(id)}
             >
-              <span>{icon(id)}</span>
+              <span>{viewIcon(id)}</span>
               {label}
               {id === "approvals" && snapshot.approvals.length > 0 ? (
                 <em>{snapshot.approvals.length}</em>
@@ -149,7 +60,7 @@ export function App() {
         <header>
           <div>
             <p className="eyebrow">LOCAL-FIRST WORKSPACE</p>
-            <h1>{title(view)}</h1>
+            <h1>{viewTitle(view)}</h1>
           </div>
           <button
             className="ghost"
@@ -1637,7 +1548,7 @@ function SkillStudio({
       name: String(form.get("name")),
       version: String(form.get("version")),
       content: String(form.get("content")),
-      permissions: split(String(form.get("permissions"))) as any,
+      permissions: splitCommaSeparated(String(form.get("permissions"))) as any,
       reviewed: Boolean(form.get("reviewed")),
     });
     setShow(false);
@@ -1795,7 +1706,7 @@ function Safety({ data }: { data: DesktopSnapshot }) {
                     onChange={(e) =>
                       setPolicy({
                         ...policy,
-                        commandAllowlist: split(e.target.value),
+                        commandAllowlist: splitCommaSeparated(e.target.value),
                       })
                     }
                   />
@@ -1807,7 +1718,7 @@ function Safety({ data }: { data: DesktopSnapshot }) {
                     onChange={(e) =>
                       setPolicy({
                         ...policy,
-                        environmentAllowlist: split(e.target.value),
+                        environmentAllowlist: splitCommaSeparated(e.target.value),
                       })
                     }
                   />
@@ -1861,7 +1772,7 @@ function BrowserConfig({ projectId }: { projectId: string }) {
       baseUrl,
       healthCheckUrl: String(form.get("healthUrl")),
       startCommand: String(form.get("command")),
-      startArgs: split(String(form.get("args"))),
+      startArgs: splitCommaSeparated(String(form.get("args"))),
       setupCommand: null,
       cleanupCommand: null,
       credentialKeys: credentialKey ? [credentialKey] : [],
@@ -1928,181 +1839,4 @@ function BrowserConfig({ projectId }: { projectId: string }) {
       </form>
     </Panel>
   );
-}
-
-function usePagination<T>(items: T[], resetKey = "", pageSize = 8) {
-  const [page, setPage] = useState(1);
-  const slice = paginate(items, page, pageSize);
-  useEffect(() => setPage(1), [resetKey]);
-  useEffect(() => setPage(slice.page), [slice.page]);
-  return {
-    ...slice,
-    setPage,
-  };
-}
-
-function Pagination({
-  page,
-  setPage,
-  pageSize,
-  total,
-  totalPages,
-  label,
-}: {
-  page: number;
-  setPage: (page: number | ((current: number) => number)) => void;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-  label: string;
-}) {
-  if (total <= pageSize) return null;
-  const first = (page - 1) * pageSize + 1;
-  const last = Math.min(page * pageSize, total);
-  return (
-    <nav className="pagination" aria-label={`${pretty(label)} pagination`}>
-      <span>{first}–{last} of {total} {label}</span>
-      <div>
-        <button aria-label={`Previous ${label} page`} disabled={page === 1} onClick={() => setPage((current) => current - 1)}>←</button>
-        <strong>Page {page} of {totalPages}</strong>
-        <button aria-label={`Next ${label} page`} disabled={page === totalPages} onClick={() => setPage((current) => current + 1)}>→</button>
-      </div>
-    </nav>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  note,
-  tone,
-}: {
-  label: string;
-  value: number;
-  note: string;
-  tone: string;
-}) {
-  return (
-    <article className={`metric ${tone}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{note}</small>
-    </article>
-  );
-}
-function Panel({
-  title,
-  children,
-  action,
-  onAction,
-}: {
-  title: string;
-  children: React.ReactNode;
-  action?: string;
-  onAction?: () => void;
-}) {
-  return (
-    <article className="panel">
-      <div className="panel-head">
-        <h2>{title}</h2>
-        {action && <button onClick={onAction}>{action} →</button>}
-      </div>
-      {children}
-    </article>
-  );
-}
-function Badge({ text }: { text: string }) {
-  const value = text.toLowerCase();
-  const tone = value.includes("fail") || value.includes("reject")
-    ? "danger"
-    : value.includes("complete") || value.includes("ready") || value.includes("verified")
-      ? "success"
-      : value.includes("pause") || value.includes("pending") || value.includes("approval")
-        ? "warning"
-        : "neutral";
-  return <span className={`badge ${tone}`}>{text}</span>;
-}
-function Empty({ title, copy }: { title: string; copy: string }) {
-  return (
-    <div className="empty">
-      <span>◇</span>
-      <strong>{title}</strong>
-      <p>{copy}</p>
-    </div>
-  );
-}
-function Guard({ title, copy }: { title: string; copy: string }) {
-  return (
-    <div>
-      <span>✓</span>
-      <strong>{title}</strong>
-      <p>{copy}</p>
-    </div>
-  );
-}
-function projectName(data: DesktopSnapshot, id: string | null) {
-  return data.projects.find((p) => p.id === id)?.name ?? "Unassigned";
-}
-function taskName(data: DesktopSnapshot, id: string) {
-  return data.tasks.find((task) => task.id === id)?.title ?? "Unknown task";
-}
-function pretty(value: string) {
-  return value.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function formatCheckedAt(value: Date | string) {
-  const checkedAt = new Date(value);
-  if (Number.isNaN(checkedAt.getTime())) return "successfully";
-  return checkedAt.toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-function split(value: string) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-function splitLines(value: string) {
-  return value
-    .split(/\r?\n/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-function folderName(path: string) {
-  return path.replace(/[\\/]+$/, "").split(/[\\/]/).at(-1) ?? path;
-}
-function title(view: View) {
-  return (
-    {
-      overview: "Command center",
-      projects: "Projects",
-      tasks: "Task workspace",
-      runs: "Workflow runs",
-      approvals: "Approval inbox",
-      agents: "Agent roles",
-      providers: "Model providers",
-      notifications: "Notifications",
-      safety: "Safety and permissions",
-    } as const
-  )[view];
-}
-function icon(view: View) {
-  return (
-    {
-      overview: "⌂",
-      projects: "▦",
-      tasks: "✓",
-      runs: "▶",
-      approvals: "!",
-      agents: "◎",
-      providers: "◉",
-      notifications: "◌",
-      safety: "◈",
-    } as const
-  )[view];
-}
-function message(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
 }

@@ -1,6 +1,7 @@
 # Awenes OS agent guide
 
 Read `.ai/context/product.md`, `.ai/context/architecture.md`, and the relevant task/checkpoint before changing code.
+Follow `docs/coding-standards.md` for layering, component design, naming, and validation expectations.
 
 ## Engineering rules
 
