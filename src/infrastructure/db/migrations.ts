@@ -97,6 +97,24 @@ export const databaseMigrations: DatabaseMigration[] = [{
     `CREATE TABLE IF NOT EXISTS git_deliveries (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES workflow_runs(id), branch TEXT NOT NULL, commit_sha TEXT, pushed INTEGER NOT NULL, remote TEXT, review TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
     `CREATE UNIQUE INDEX IF NOT EXISTS git_deliveries_run_unique ON git_deliveries(run_id)`
   ]
+}, {
+  version: 11,
+  name: "workflow_overhaul_foundation",
+  statements: [
+    `ALTER TABLE projects ADD COLUMN autonomy_mode TEXT NOT NULL DEFAULT 'balanced'`,
+    `ALTER TABLE tasks ADD COLUMN acceptance_criteria TEXT NOT NULL DEFAULT '[]'`,
+    `ALTER TABLE tasks ADD COLUMN archived_at INTEGER`,
+    `ALTER TABLE tasks ADD COLUMN deleted_at INTEGER`,
+    `ALTER TABLE workflow_runs ADD COLUMN revision INTEGER NOT NULL DEFAULT 1`,
+    `ALTER TABLE workflow_runs ADD COLUMN last_activity TEXT`,
+    `ALTER TABLE workflow_runs ADD COLUMN lease_owner TEXT`,
+    `ALTER TABLE workflow_runs ADD COLUMN lease_expires_at INTEGER`,
+    `CREATE TABLE workflow_plans (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES workflow_runs(id), version INTEGER NOT NULL, content TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, decided_at INTEGER)`,
+    `CREATE UNIQUE INDEX workflow_plans_run_version_unique ON workflow_plans(run_id, version)`,
+    `CREATE TABLE workflow_interventions (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES workflow_runs(id), kind TEXT NOT NULL, title TEXT NOT NULL, detail TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, resolved_at INTEGER)`,
+    `CREATE INDEX workflow_interventions_run_status_idx ON workflow_interventions(run_id, status)`,
+    `CREATE TABLE task_tombstones (task_id TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)`
+  ]
 }];
 
 export const currentDatabaseVersion = databaseMigrations.at(-1)?.version ?? 0;

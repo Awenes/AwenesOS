@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { DesktopSnapshot } from "../../contracts";
 import type { ExecutionPolicy } from "../../../src/domain/project";
+import {
+  PROVIDER_MODELS,
+  providerModelName,
+} from "../../../src/domain/provider-model";
 
 type View =
   | "overview"
@@ -23,11 +27,11 @@ const empty: DesktopSnapshot = {
   pendingCrm: 0,
   pendingTracker: 0,
 };
-
 export function App() {
   const [snapshot, setSnapshot] = useState(empty);
   const [view, setView] = useState<View>("overview");
   const [loading, setLoading] = useState(true);
+  const [pendingOperations, setPendingOperations] = useState(0);
   const [error, setError] = useState("");
   const refresh = async () => {
     setLoading(true);
@@ -40,9 +44,24 @@ export function App() {
       setLoading(false);
     }
   };
+  useEffect(() => window.awenes.onActivity(setPendingOperations), []);
   useEffect(() => {
     void refresh();
   }, []);
+  const workflowActive = snapshot.runs.some(
+    (run) => run.status === "running" && run.stepStatus === "running",
+  );
+  useEffect(() => {
+    if (!workflowActive) return;
+    const timer = window.setInterval(async () => {
+      try {
+        setSnapshot(await window.awenes.snapshot());
+      } catch (cause) {
+        setError(message(cause));
+      }
+    }, 1_500);
+    return () => window.clearInterval(timer);
+  }, [workflowActive]);
   useEffect(() => {
     const rejected = (event: PromiseRejectionEvent) => {
       event.preventDefault();
@@ -61,7 +80,13 @@ export function App() {
     ].includes(task.status),
   );
   return (
-    <div className="shell">
+    <div className="shell" aria-busy={loading || pendingOperations > 0}>
+      {(loading || pendingOperations > 0) && (
+        <div className="activity" role="status" aria-live="polite">
+          <span className="spinner" />
+          Working…
+        </div>
+      )}
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-mark">A</span>
@@ -153,18 +178,24 @@ function Providers({
   refresh: () => Promise<void>;
 }) {
   const [show, setShow] = useState(false);
+  const [kind, setKind] = useState<"openai" | "anthropic">("openai");
+  const [authMethod, setAuthMethod] = useState<"api_key" | "cli">("api_key");
+  const [models, setModels] = useState<string[]>([
+    PROVIDER_MODELS.openai[0].id,
+  ]);
+  const [verifyingProvider, setVerifyingProvider] = useState<string | null>(
+    null,
+  );
+  useEffect(() => setModels([PROVIDER_MODELS[kind][0].id]), [kind]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const kind = String(form.get("kind")) as "openai" | "anthropic";
-    const authMethod = String(form.get("auth")) as "api_key" | "cli";
     await window.awenes.connectProvider({
       name: String(form.get("name")),
       kind,
       authMethod,
-      command:
-        authMethod === "cli" ? (kind === "openai" ? "codex" : "claude") : null,
-      models: split(String(form.get("models"))),
+      command: authMethod === "cli" ? String(form.get("command")) : null,
+      models,
       apiKey: authMethod === "api_key" ? String(form.get("key")) : undefined,
     });
     setShow(false);
@@ -190,32 +221,83 @@ function Providers({
           <div className="form-grid">
             <label>
               Provider
-              <select name="kind">
+              <select
+                name="kind"
+                value={kind}
+                onChange={(event) =>
+                  setKind(event.target.value as "openai" | "anthropic")
+                }
+              >
                 <option value="openai">OpenAI / Codex</option>
                 <option value="anthropic">Anthropic / Claude</option>
               </select>
             </label>
             <label>
               Authentication
-              <select name="auth">
+              <select
+                name="auth"
+                value={authMethod}
+                onChange={(event) =>
+                  setAuthMethod(event.target.value as "api_key" | "cli")
+                }
+              >
                 <option value="api_key">API key</option>
-                <option value="cli">Existing CLI login</option>
+                <option value="cli">Use an existing provider sign-in</option>
               </select>
             </label>
           </div>
-          <label>
-            API key
-            <input
-              name="key"
-              type="password"
-              autoComplete="off"
-              placeholder="Leave blank for CLI login"
-            />
-          </label>
-          <label>
-            Models (comma separated)
-            <input name="models" placeholder="Model IDs you intend to use" />
-          </label>
+          {authMethod === "api_key" ? (
+            <label>
+              API key
+              <input name="key" type="password" autoComplete="off" required />
+            </label>
+          ) : (
+            <>
+              <p className="field-help">
+                Use this option only if you already use {kind === "openai" ? "Codex" : "Claude"}
+                {" "}from a terminal on this computer. AwenesOS will reuse that
+                sign-in; it will not open a new login window.
+              </p>
+              <details className="advanced">
+                <summary>Advanced: CLI location</summary>
+                <label>
+                  Program location
+                  <input
+                    key={kind}
+                    name="command"
+                    required
+                    defaultValue={kind === "openai" ? "codex" : "claude"}
+                    placeholder="Command name or full executable path"
+                  />
+                </label>
+                <small>
+                  Keep the default unless AwenesOS says it cannot find the
+                  provider program. In that case, browse Windows for the
+                  executable and paste its complete location here.
+                </small>
+              </details>
+            </>
+          )}
+          <fieldset className="model-picker">
+            <legend>Models available to agents</legend>
+            {PROVIDER_MODELS[kind].map((model) => (
+              <label key={model.id} className="check">
+                <input
+                  type="checkbox"
+                  checked={models.includes(model.id)}
+                  onChange={(event) =>
+                    setModels((current) =>
+                      event.target.checked
+                        ? [...current, model.id]
+                        : current.filter((id) => id !== model.id),
+                    )
+                  }
+                />
+                {model.name}
+              </label>
+            ))}
+            {!models.length && <small>Choose at least one model.</small>}
+          </fieldset>
           <div className="form-actions">
             <button
               type="button"
@@ -224,7 +306,9 @@ function Providers({
             >
               Cancel
             </button>
-            <button className="primary">Connect and verify</button>
+            <button className="primary" disabled={!models.length}>
+              Connect and verify
+            </button>
           </div>
         </form>
       )}
@@ -239,22 +323,34 @@ function Providers({
               <p>
                 {pretty(provider.authMethod)} ·{" "}
                 {provider.error ??
-                  "Credential is stored outside the project database"}
+                  (provider.status === "ready"
+                    ? provider.lastCheckedAt
+                      ? `Verified ${formatCheckedAt(provider.lastCheckedAt)}`
+                      : "Connection verified"
+                    : "Waiting for verification")}
               </p>
               <div className="tags">
                 <Badge text={pretty(provider.kind)} />
                 <Badge text={pretty(provider.status)} />
               </div>
             </div>
-            <button
-              className="small-button"
-              onClick={async () => {
-                await window.awenes.verifyProvider(provider.id);
-                await refresh();
-              }}
-            >
-              Verify
-            </button>
+            {provider.status !== "ready" && (
+              <button
+                className="small-button"
+                disabled={verifyingProvider === provider.id}
+                onClick={async () => {
+                  setVerifyingProvider(provider.id);
+                  try {
+                    await window.awenes.verifyProvider(provider.id);
+                    await refresh();
+                  } finally {
+                    setVerifyingProvider(null);
+                  }
+                }}
+              >
+                {verifyingProvider === provider.id ? "Verifying…" : "Verify"}
+              </button>
+            )}
             <button
               className="small-button"
               onClick={async () => {
@@ -441,6 +537,17 @@ function Projects({
   refresh: () => Promise<void>;
 }) {
   const [show, setShow] = useState(false);
+  const [repositoryRoot, setRepositoryRoot] = useState("");
+  const [choosingFolder, setChoosingFolder] = useState(false);
+  async function chooseFolder() {
+    setChoosingFolder(true);
+    try {
+      const selected = await window.awenes.selectProjectDirectory();
+      if (selected) setRepositoryRoot(selected);
+    } finally {
+      setChoosingFolder(false);
+    }
+  }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -470,7 +577,22 @@ function Projects({
           </label>
           <label>
             Repository path
-            <input name="path" required placeholder="C:\code\customer-portal" />
+            <div className="input-action">
+              <input
+                name="path"
+                required
+                readOnly
+                value={repositoryRoot}
+                placeholder="Choose a local Git repository"
+              />
+              <button
+                type="button"
+                className="small-button"
+                onClick={() => void chooseFolder()}
+              >
+                {choosingFolder ? "Opening…" : "Browse…"}
+              </button>
+            </div>
           </label>
           <div className="form-grid">
             <label>
@@ -588,8 +710,8 @@ function Tasks({
           </label>
           <label>
             Project
-            <select name="project">
-              <option value="">Unassigned</option>
+            <select name="project" required defaultValue="">
+              <option value="" disabled>Choose project</option>
               {data.projects.map((p) => (
                 <option value={p.id} key={p.id}>
                   {p.name}
@@ -614,7 +736,7 @@ function Tasks({
             >
               Cancel
             </button>
-            <button className="primary">Capture task</button>
+            <button className="primary">Start task</button>
           </div>
         </form>
       )}
@@ -822,6 +944,17 @@ function Runs({
   const [selected, setSelected] = useState<string | null>(null);
   const [details, setDetails] = useState<any>(null);
   const [busy, setBusy] = useState(false);
+  const [executingStage, setExecutingStage] = useState<string | null>(null);
+  const [executionSeconds, setExecutionSeconds] = useState(0);
+  useEffect(() => {
+    if (!executingStage) return;
+    setExecutionSeconds(0);
+    const timer = window.setInterval(
+      () => setExecutionSeconds((value) => value + 1),
+      1_000,
+    );
+    return () => window.clearInterval(timer);
+  }, [executingStage]);
   async function open(id: string) {
     setSelected(id);
     setDetails(await window.awenes.runDetails(id));
@@ -831,11 +964,13 @@ function Runs({
     action: "next" | "pause" | "resume" | "cancel",
   ) {
     setBusy(true);
+    if (action === "next") setExecutingStage(details?.run.currentStage ?? "stage");
     try {
       await window.awenes.runAction({ runId, action });
       await refresh();
       await open(runId);
     } finally {
+      setExecutingStage(null);
       setBusy(false);
     }
   }
@@ -853,6 +988,39 @@ function Runs({
           message: `feat: complete ${taskName(data, details?.run?.taskId)}`,
         });
       else await window.awenes.gitPush(runId);
+      await refresh();
+      await open(runId);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function allowProviderAndResume(runId: string, projectId: string) {
+    setBusy(true);
+    try {
+      const policy = await window.awenes.executionPolicy(projectId);
+      const providerCommands = data.providers
+        .filter((provider) => provider.status === "ready" && provider.command)
+        .map((provider) => provider.command!);
+      await window.awenes.saveExecutionPolicy({
+        projectId,
+        policy: {
+          ...policy,
+          networkAccess: "public",
+          commandAllowlist: [
+            ...new Set([...policy.commandAllowlist, ...providerCommands]),
+          ],
+          environmentAllowlist: [
+            ...new Set([
+              ...policy.environmentAllowlist,
+              "PATH",
+              "Path",
+              "PATHEXT",
+              "SystemRoot",
+            ]),
+          ],
+        },
+      });
+      await window.awenes.runAction({ runId, action: "resume" });
       await refresh();
       await open(runId);
     } finally {
@@ -877,7 +1045,17 @@ function Runs({
                     {run.error ?? projectName(data, run.projectId)}
                   </small>
                 </span>
-                <Badge text={pretty(run.status)} />
+                <Badge
+                  text={
+                    run.id === selected && executingStage
+                      ? `Running ${pretty(executingStage)}`
+                      : run.status === "running"
+                        ? run.stepStatus === "running"
+                          ? `Working: ${pretty(run.currentStage ?? "task")}`
+                          : "Preparing"
+                        : pretty(run.status)
+                  }
+                />
               </button>
             ))
           ) : (
@@ -896,11 +1074,30 @@ function Runs({
           ) : (
             <>
               <div className="run-actions">
+                {details.run.status === "failed" &&
+                  /Network access denied|Command is not allowed/.test(
+                    details.run.error ?? "",
+                  ) && (
+                    <button
+                      className="primary"
+                      disabled={busy}
+                      onClick={() =>
+                        void allowProviderAndResume(
+                          details.run.id,
+                          details.run.projectId,
+                        )
+                      }
+                    >
+                      Allow provider access and retry
+                    </button>
+                  )}
                 <button
-                  disabled={busy}
+                  disabled={busy || details.run.status !== "running"}
                   onClick={() => void action(details.run.id, "next")}
                 >
-                  Run next stage
+                  {executingStage
+                    ? `Running ${pretty(executingStage)}… ${executionSeconds}s`
+                    : `Run ${pretty(details.run.currentStage ?? "next")} stage`}
                 </button>
                 <button
                   disabled={busy}
@@ -1161,6 +1358,7 @@ function RoleConfig({
   const [prompt, setPrompt] = useState("");
   const [details, setDetails] = useState<any>(null);
   const [skills, setSkills] = useState<any[]>([]);
+  const selectedProvider = data.providers.find((item) => item.id === provider);
   async function edit() {
     const [value, available]: any[] = await Promise.all([
       window.awenes.promptDetails(role.id),
@@ -1176,7 +1374,10 @@ function RoleConfig({
       <span>Provider and model</span>
       <select
         value={provider}
-        onChange={(event) => setProvider(event.target.value)}
+        onChange={(event) => {
+          setProvider(event.target.value);
+          setModel("");
+        }}
       >
         <option value="">Choose provider</option>
         {data.providers
@@ -1187,11 +1388,22 @@ function RoleConfig({
             </option>
           ))}
       </select>
-      <input
+      <select
         value={model}
         onChange={(event) => setModel(event.target.value)}
-        placeholder="Provider model ID"
-      />
+        disabled={!selectedProvider || !selectedProvider.models.length}
+      >
+        <option value="">
+          {selectedProvider?.models.length
+            ? "Choose model"
+            : "Choose a provider first"}
+        </option>
+        {selectedProvider?.models.map((modelId) => (
+          <option key={modelId} value={modelId}>
+            {providerModelName(selectedProvider.kind, modelId)}
+          </option>
+        ))}
+      </select>
       <div className="run-actions">
         <button
           disabled={!provider || !model}
@@ -1663,6 +1875,15 @@ function taskName(data: DesktopSnapshot, id: string) {
 }
 function pretty(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatCheckedAt(value: Date | string) {
+  const checkedAt = new Date(value);
+  if (Number.isNaN(checkedAt.getTime())) return "successfully";
+  return checkedAt.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 function split(value: string) {
   return value

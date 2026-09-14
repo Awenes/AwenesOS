@@ -31,8 +31,8 @@ export class TaskRepository {
   constructor(private readonly db: Database) {}
 
   async create(input: CaptureTask): Promise<Task> {
-    const now = input.occurredAt;
-    const task: Task = { id: randomUUID(), projectId: null, title: input.title, source: input.source, sourceReference: input.sourceReference ?? null, assignmentDescription: input.assignmentDescription, completionDescription: null, status: input.assignedToMe ? "assigned" : "captured", assignedToMe: input.assignedToMe, syncError: null, createdAt: now, updatedAt: now, completedAt: null };
+    const now = input.occurredAt ?? new Date();
+    const task: Task = { id: randomUUID(), projectId: null, title: input.title, source: input.source, sourceReference: input.sourceReference ?? null, assignmentDescription: input.assignmentDescription ?? "", completionDescription: null, status: input.assignedToMe ? "assigned" : "captured", assignedToMe: input.assignedToMe ?? false, syncError: null, createdAt: now, updatedAt: now, completedAt: null, acceptanceCriteria: input.acceptanceCriteria ?? [], archivedAt: null, deletedAt: null };
     await this.db.insert(tasks).values(task);
     await this.event(task.id, "task.captured", { source: task.source, assignedToMe: task.assignedToMe }, now);
     return task;

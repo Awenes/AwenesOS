@@ -6,17 +6,27 @@ export const CompletionPolicySchema = z.enum([
   "auto_push",
 ]);
 export type CompletionPolicy = z.infer<typeof CompletionPolicySchema>;
+export const AutonomyModeSchema = z.enum(["guided", "balanced", "autonomous"]);
+export type AutonomyMode = z.infer<typeof AutonomyModeSchema>;
 
 export const RegisterProjectSchema = z.object({
   name: z.string().trim().min(1).max(120),
   repositoryRoot: z.string().trim().min(1),
   defaultBranch: z.string().trim().min(1).default("main"),
   completionPolicy: CompletionPolicySchema.default("manual"),
+  autonomyMode: AutonomyModeSchema.default("balanced"),
 });
-export type RegisterProject = z.infer<typeof RegisterProjectSchema>;
+export interface RegisterProject {
+  name: string;
+  repositoryRoot: string;
+  defaultBranch: string;
+  completionPolicy: CompletionPolicy;
+  autonomyMode?: AutonomyMode;
+}
 
-export interface Project extends RegisterProject {
+export interface Project extends Omit<RegisterProject, "autonomyMode"> {
   id: string;
+  autonomyMode: AutonomyMode;
   createdAt: Date;
   updatedAt: Date;
 }

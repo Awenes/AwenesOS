@@ -30,7 +30,12 @@ export const ApprovalKindSchema = z.enum([
   "commit",
   "push",
   "completion",
+  "plan",
 ]);
+export const InterventionKindSchema = z.enum(["setup", "question", "permission", "failure", "review"]);
+export type InterventionKind = z.infer<typeof InterventionKindSchema>;
+export interface WorkflowPlan { id: string; runId: string; version: number; content: string; status: "draft" | "awaiting_approval" | "approved" | "changes_requested"; createdAt: Date; decidedAt: Date | null; }
+export interface WorkflowIntervention { id: string; runId: string; kind: InterventionKind; title: string; detail: string; status: "open" | "resolved"; createdAt: Date; resolvedAt: Date | null; }
 export type WorkflowStage = z.infer<typeof WorkflowStageSchema>;
 export type WorkflowRunStatus = z.infer<typeof WorkflowRunStatusSchema>;
 export type WorkflowStepStatus = z.infer<typeof WorkflowStepStatusSchema>;

@@ -184,13 +184,14 @@ Expected:
 Steps:
 
 1. Open Projects and select **Add project**.
-2. Register the disposable repository with branch `main` and policy **Preview manually**.
+2. Use **Browse** to select the disposable repository, then register it with branch `main` and policy **Preview manually**.
 3. Register a second disposable repository.
 4. Open Tasks and switch the project filter.
 
 Expected:
 
 - Both projects remain visible with distinct paths and task counts.
+- The native Windows folder picker supplies the repository path; manual path typing is not required.
 - No source files or branches change merely because a project was registered.
 - Task filtering never mixes project-specific results.
 - Restarting AwenesOS preserves both projects.
@@ -246,13 +247,16 @@ API-key variation:
 CLI variation:
 
 1. Confirm Codex or Claude CLI is already signed in outside AwenesOS.
-2. Add the matching provider with CLI authentication and command name.
+2. Add the matching provider with CLI authentication. Leave the advanced program location at its default unless Windows cannot find the installed CLI.
 3. Verify the connection.
 4. Repeat with a nonexistent command.
 
 Expected:
 
 - Valid connections become ready; invalid ones show an actionable error.
+- A ready connection shows its verification time and no longer offers a redundant **Verify** button.
+- Model choices use friendly names while AwenesOS retains the exact provider ID internally.
+- A visible loading indicator remains present while verification is in progress.
 - API keys are never displayed again in plaintext.
 - Disconnect removes stored credentials and prevents new runs from using the connection.
 - Existing CLI login is checked; AwenesOS does not imitate or scrape a browser login.
@@ -270,6 +274,7 @@ Steps:
 Expected:
 
 - Each role shows its capabilities.
+- Model assignment uses a provider-specific dropdown with friendly model names; users never need to type a model ID.
 - Assignments persist.
 - A run cannot be created when a required role is disabled.
 - Review/planning roles do not receive file-write access.
@@ -381,6 +386,7 @@ Steps:
 Expected:
 
 - Each stage uses its assigned role/provider/model and the task worktree.
+- A pending stage is labelled **Ready**. Only an actively executing stage is labelled **Running**, with elapsed time visible.
 - Outputs and attempts persist in the run inspector.
 - Provider traffic is denied without explicit public-network permission.
 - The normal repository checkout remains unchanged during agent execution.

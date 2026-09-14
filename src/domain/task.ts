@@ -18,9 +18,18 @@ export const CaptureTaskSchema = z.object({
   sourceReference: z.string().trim().max(2_000).optional(),
   assignedToMe: z.boolean().default(false),
   occurredAt: z.coerce.date().default(() => new Date())
+  ,acceptanceCriteria: z.array(z.string().trim().min(1).max(500)).max(50).default([])
 });
 
-export type CaptureTask = z.infer<typeof CaptureTaskSchema>;
+export interface CaptureTask {
+  title: string;
+  source: TaskSource;
+  sourceReference?: string | undefined;
+  assignmentDescription?: string;
+  assignedToMe?: boolean;
+  occurredAt?: Date;
+  acceptanceCriteria?: string[];
+}
 
 export interface Task {
   id: string;
@@ -36,6 +45,9 @@ export interface Task {
   createdAt: Date;
   updatedAt: Date;
   completedAt: Date | null;
+  acceptanceCriteria: string[];
+  archivedAt: Date | null;
+  deletedAt: Date | null;
 }
 
 const allowed: Record<TaskStatus, readonly TaskStatus[]> = {

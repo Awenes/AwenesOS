@@ -206,7 +206,15 @@ export class WorkflowRepository {
       .from(workflowRuns)
       .where(eq(workflowRuns.status, "running"));
     const now = new Date();
+    let recovered = 0;
     for (const run of interrupted) {
+      const activeStep = await this.db.query.workflowSteps.findFirst({
+        where: and(
+          eq(workflowSteps.runId, run.id),
+          eq(workflowSteps.status, "running"),
+        ),
+      });
+      if (!activeStep) continue;
       await this.db
         .update(workflowSteps)
         .set({
@@ -234,8 +242,9 @@ export class WorkflowRepository {
         { previousStatus: "running" },
         now,
       );
+      recovered += 1;
     }
-    return interrupted.length;
+    return recovered;
   }
   private event(
     runId: string,

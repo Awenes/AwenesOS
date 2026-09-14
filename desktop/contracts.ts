@@ -48,6 +48,7 @@ export interface DesktopSnapshot {
     models: string[];
     status: ProviderStatus;
     error: string | null;
+    lastCheckedAt: Date | null;
   }>;
   runs: Array<{
     id: string;
@@ -57,6 +58,7 @@ export interface DesktopSnapshot {
     currentStage: string | null;
     error: string | null;
     updatedAt: Date;
+    stepStatus: string | null;
   }>;
   approvals: Array<{
     id: string;
@@ -79,7 +81,9 @@ export interface DesktopSnapshot {
 }
 
 export interface DesktopApi {
+  onActivity(listener: (pendingOperations: number) => void): () => void;
   snapshot(): Promise<DesktopSnapshot>;
+  selectProjectDirectory(): Promise<string | null>;
   addProject(input: {
     name: string;
     repositoryRoot: string;

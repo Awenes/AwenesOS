@@ -127,4 +127,9 @@ export class WorkflowService {
     );
     return this.runs.setState(id, "running", next?.stage ?? "delivery");
   }
+  async fail(id: string, error: unknown) {
+    const run = await this.runs.get(id);
+    const detail = error instanceof Error ? error.message : String(error);
+    return this.runs.setState(id, "failed", run.currentStage, detail);
+  }
 }

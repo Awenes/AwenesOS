@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  dialog,
   ipcMain,
   Notification,
   protocol,
@@ -167,6 +168,7 @@ async function start() {
     outputRoot,
   );
   await roleService.initializeBuiltIns();
+  await assignUnconfiguredRoles(roleService, providerService);
   await instructionService.initializeBuiltIns();
   await workflowService.recoverInterrupted();
   app.on("before-quit", () => {
@@ -199,7 +201,7 @@ async function start() {
   session.defaultSession.setPermissionRequestHandler((_w, _p, callback) =>
     callback(false),
   );
-  registerIpc(mainWindow, {
+  const desktopServices: Services = {
     taskService,
     projectService,
     roleService,
@@ -212,8 +214,12 @@ async function start() {
     notificationService,
     projects,
     deliveries,
-  });
+  };
+  registerIpc(mainWindow, desktopServices);
   await mainWindow.loadURL("awenes://app/index.html");
+  for (const run of await workflowService.list()) {
+    if (run.status === "running") void runAutomatically(run.id, desktopServices);
+  }
   startNotificationPump(notificationService);
   const capturePath = process.argv
     .find((value) => value.startsWith("capture="))
@@ -304,12 +310,20 @@ function registerIpc(window: BrowserWindow, s: Services) {
     )
       .flat()
       .filter((value) => value.status === "pending");
+    const runSteps = await Promise.all(
+      runs.map((run) => s.workflowService.steps(run.id)),
+    );
     return {
       projects,
       tasks,
       roles,
       providers,
-      runs,
+      runs: runs.map((run, index) => ({
+        ...run,
+        stepStatus:
+          runSteps[index]?.find((step) => step.stage === run.currentStage)
+            ?.status ?? null,
+      })),
       approvals,
       notifications,
       pendingCrm: pendingCrm.length,
@@ -326,6 +340,13 @@ function registerIpc(window: BrowserWindow, s: Services) {
       })
       .parse(input);
     await s.projectService.register(value);
+  });
+  handle("awenes:project:select-directory", async () => {
+    const result = await dialog.showOpenDialog(window, {
+      title: "Select a local Git repository",
+      properties: ["openDirectory"],
+    });
+    return result.canceled ? null : (result.filePaths[0] ?? null);
   });
   handle("awenes:project:readiness", async (input) =>
     s.projectService.readiness(z.string().uuid().parse(input)),
@@ -352,11 +373,17 @@ function registerIpc(window: BrowserWindow, s: Services) {
       title: value.title,
       source: value.source,
       assignmentDescription: value.description,
-      assignedToMe: false,
+      assignedToMe: Boolean(value.projectId),
       occurredAt: new Date(),
     });
-    if (value.projectId)
+    if (value.projectId) {
       await s.taskService.assignProject(task.id, value.projectId, s.projects);
+      await s.taskService.claim(task.id);
+      await s.taskService.start(task.id);
+      const created = await s.workflowService.create(task.id);
+      await s.workflowService.decide(created.approval.id, true);
+      void runAutomatically(created.run.id, s);
+    }
   });
   handle("awenes:task:action", async (input) => {
     const value = z
@@ -457,10 +484,12 @@ function registerIpc(window: BrowserWindow, s: Services) {
         })
         .parse(input),
       { apiKey, ...connection } = value;
-    await s.providerService.connect(
+    const connected = await s.providerService.connect(
       ProviderConnectionInputSchema.parse(connection),
       apiKey,
     );
+    if (connected.status === "ready")
+      await assignUnconfiguredRoles(s.roleService, s.providerService);
   });
   handle("awenes:provider:verify", async (input) => {
     await s.providerService.verify(z.string().uuid().parse(input));
@@ -502,7 +531,10 @@ function registerIpc(window: BrowserWindow, s: Services) {
           await s.gitService.push(result.id);
         }
       }
-    } else await s.workflowService[value.action](value.runId);
+    } else {
+      await s.workflowService[value.action](value.runId);
+      if (value.action === "resume") void runAutomatically(value.runId, s);
+    }
   });
   handle("awenes:approval:decide", async (input) => {
     const value = z
@@ -510,6 +542,8 @@ function registerIpc(window: BrowserWindow, s: Services) {
       .parse(input);
     const approval = await s.workflowService.approval(value.approvalId);
     await s.workflowService.decide(value.approvalId, value.approved);
+    if (value.approved && approval.kind === "start")
+      void runAutomatically(approval.runId, s);
     if (value.approved && approval.kind === "push") {
       const run = await s.workflowService.get(approval.runId);
       const { task } = await s.taskService.taskSummary(run.taskId);
@@ -563,6 +597,39 @@ function registerIpc(window: BrowserWindow, s: Services) {
       await s.notificationService.dismiss(value.key);
     else await s.notificationService.snoozeFor(value.key, "1h");
   });
+}
+
+const automaticRuns = new Set<string>();
+async function assignUnconfiguredRoles(
+  roles: AgentRoleService,
+  providers: ProviderService,
+) {
+  const ready = (await providers.list()).find(
+    (provider) => provider.status === "ready" && provider.models.length,
+  );
+  if (!ready) return;
+  const defaultModel = ready.models[0];
+  if (!defaultModel) return;
+  for (const role of await roles.list()) {
+    if (role.enabled && (!role.providerId || !role.modelId))
+      await roles.assignModel(role.id, ready.id, defaultModel);
+  }
+}
+
+async function runAutomatically(runId: string, services: Services) {
+  if (automaticRuns.has(runId)) return;
+  automaticRuns.add(runId);
+  try {
+    for (;;) {
+      const run = await services.workflowService.get(runId);
+      if (run.status !== "running") return;
+      await services.workflowEngine.executeNext(runId);
+    }
+  } catch (error) {
+    await services.workflowService.fail(runId, error);
+  } finally {
+    automaticRuns.delete(runId);
+  }
 }
 function contentType(path: string) {
   return (

@@ -14,6 +14,9 @@ export const tasks = sqliteTable("tasks", {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   completedAt: integer("completed_at", { mode: "timestamp_ms" })
+  ,acceptanceCriteria: text("acceptance_criteria", { mode: "json" }).$type<string[]>().notNull().default([]),
+  archivedAt: integer("archived_at", { mode: "timestamp_ms" }),
+  deletedAt: integer("deleted_at", { mode: "timestamp_ms" })
 });
 
 export const taskEvents = sqliteTable("task_events", {
@@ -78,6 +81,7 @@ export const projects = sqliteTable("projects", {
   repositoryRoot: text("repository_root").notNull(),
   defaultBranch: text("default_branch").notNull(),
   completionPolicy: text("completion_policy").notNull(),
+  autonomyMode: text("autonomy_mode").notNull().default("balanced"),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull()
 }, (table) => [uniqueIndex("projects_repository_root_unique").on(table.repositoryRoot)]);
@@ -166,8 +170,11 @@ export const roleSkillSnapshots = sqliteTable("role_skill_snapshots", {
 export const workflowRuns = sqliteTable("workflow_runs", {
   id:text("id").primaryKey(), taskId:text("task_id").notNull().references(()=>tasks.id), projectId:text("project_id").notNull().references(()=>projects.id),
   status:text("status").notNull(), currentStage:text("current_stage"), createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull(), updatedAt:integer("updated_at",{mode:"timestamp_ms"}).notNull(),
-  startedAt:integer("started_at",{mode:"timestamp_ms"}), completedAt:integer("completed_at",{mode:"timestamp_ms"}), error:text("error")
+  startedAt:integer("started_at",{mode:"timestamp_ms"}), completedAt:integer("completed_at",{mode:"timestamp_ms"}), error:text("error"), revision:integer("revision").notNull().default(1), lastActivity:text("last_activity"), leaseOwner:text("lease_owner"), leaseExpiresAt:integer("lease_expires_at",{mode:"timestamp_ms"})
 });
+export const workflowPlans=sqliteTable("workflow_plans",{id:text("id").primaryKey(),runId:text("run_id").notNull().references(()=>workflowRuns.id),version:integer("version").notNull(),content:text("content").notNull(),status:text("status").notNull(),createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull(),decidedAt:integer("decided_at",{mode:"timestamp_ms"})},table=>[uniqueIndex("workflow_plans_run_version_unique").on(table.runId,table.version)]);
+export const workflowInterventions=sqliteTable("workflow_interventions",{id:text("id").primaryKey(),runId:text("run_id").notNull().references(()=>workflowRuns.id),kind:text("kind").notNull(),title:text("title").notNull(),detail:text("detail").notNull(),status:text("status").notNull(),createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull(),resolvedAt:integer("resolved_at",{mode:"timestamp_ms"})});
+export const taskTombstones=sqliteTable("task_tombstones",{taskId:text("task_id").primaryKey(),deletedAt:integer("deleted_at",{mode:"timestamp_ms"}).notNull()});
 export const workflowSteps = sqliteTable("workflow_steps", {
   id:text("id").primaryKey(), runId:text("run_id").notNull().references(()=>workflowRuns.id), ordinal:integer("ordinal").notNull(), stage:text("stage").notNull(), roleId:text("role_id").references(()=>agentRoles.id),
   status:text("status").notNull(), attempt:integer("attempt").notNull(), instructionSnapshot:text("instruction_snapshot",{mode:"json"}).$type<Record<string,unknown>>(), output:text("output"), startedAt:integer("started_at",{mode:"timestamp_ms"}), completedAt:integer("completed_at",{mode:"timestamp_ms"})

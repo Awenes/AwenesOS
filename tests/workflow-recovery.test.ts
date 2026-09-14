@@ -40,4 +40,38 @@ describe("workflow recovery", () => {
     );
     opened.client.close();
   });
+
+  it("does not treat a ready run with a pending step as interrupted", async () => {
+    const opened = await openDatabase(":memory:");
+    const tasks = new TaskRepository(opened.db),
+      projects = new ProjectRepository(opened.db);
+    const project = await projects.create({
+      name: "A",
+      repositoryRoot: "C:\\a",
+      defaultBranch: "main",
+      completionPolicy: "manual",
+    });
+    const task = await tasks.create({
+      title: "T",
+      source: "manual",
+      assignmentDescription: "",
+      assignedToMe: true,
+      occurredAt: new Date(),
+    });
+    await tasks.assignProject(task.id, project.id);
+    const repository = new WorkflowRepository(opened.db);
+    const run = await repository.create(task.id, project.id);
+    await repository.addStep(run.id, 0, "plan", null, null);
+    await repository.setState(run.id, "running", "plan");
+
+    expect(await repository.recoverInterrupted()).toBe(0);
+    expect(await repository.get(run.id)).toMatchObject({
+      status: "running",
+      error: null,
+    });
+    expect((await repository.steps(run.id))[0]).toMatchObject({
+      status: "pending",
+    });
+    opened.client.close();
+  });
 });

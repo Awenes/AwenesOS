@@ -9,7 +9,7 @@ export class ProjectRepository {
 
   async create(input: RegisterProject): Promise<Project> {
     const now = new Date();
-    const project: Project = { id: randomUUID(), ...input, createdAt: now, updatedAt: now };
+    const project: Project = { id: randomUUID(), ...input, autonomyMode: input.autonomyMode ?? "balanced", createdAt: now, updatedAt: now };
     await this.db.insert(projects).values(project);
     await this.event(project.id, "project.registered", { repositoryRoot: project.repositoryRoot, completionPolicy: project.completionPolicy }, now);
     return project;

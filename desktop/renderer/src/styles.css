@@ -18,6 +18,34 @@ body {
   min-width: 1040px;
   min-height: 100vh;
 }
+.activity {
+  position: fixed;
+  z-index: 1000;
+  top: 18px;
+  right: 22px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #d9deea;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 8px 24px #11182720;
+  color: #364055;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 9px 13px;
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #d9deea;
+  border-top-color: #6656e8;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 button,
 input,
 select,
@@ -164,6 +192,41 @@ h1 {
 .small-button:hover {
   border-color: #8678ed;
   color: #5f4fe0;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.input-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+}
+.advanced {
+  border: 1px solid #e4e8f1;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.advanced summary {
+  cursor: pointer;
+  color: #5f4fe0;
+  font-size: 12px;
+  font-weight: 700;
+}
+.advanced label { margin-top: 12px; }
+.advanced small { display: block; margin-top: 7px; color: #717b90; }
+.model-picker {
+  border: 1px solid #e4e8f1;
+  border-radius: 10px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+.model-picker legend {
+  color: #596278;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 5px;
 }
 .stack {
   display: grid;
