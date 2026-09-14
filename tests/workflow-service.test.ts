@@ -66,6 +66,12 @@ describe("WorkflowService", () => {
     expect(
       (await runs.history(created.run.id)).map((event) => event.type),
     ).toContain("approval.approved");
+    const plan = await runs.createPlan(created.run.id, "Implement, review, and test the feature.");
+    const planApproval = await service.request(created.run.id, "plan", "Review plan");
+    expect((await service.decide(planApproval.id, false)).status).toBe("paused");
+    expect((await service.plans(created.run.id))[0]).toMatchObject({ id: plan.id, status: "changes_requested" });
+    expect(await service.interventions(created.run.id)).toMatchObject([{ kind: "review", status: "open" }]);
+    await service.resume(created.run.id);
     const completion = await service.request(
       created.run.id,
       "completion",

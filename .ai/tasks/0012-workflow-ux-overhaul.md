@@ -27,4 +27,4 @@ Rebuild AwenesOS around the developer journey: add a project, start a task, inte
 
 ## Current checkpoint
 
-Checkpoints 1 and 2 are implemented. The desktop UI now exposes operating modes, acceptance criteria, semantic statuses, archive/delete actions, and the dark command-center design system. Automated validation is green; visual QA is required before the guided onboarding and task-cockpit layouts are finalized.
+Checkpoints 1–5 are implemented, along with the checkpoint 6 archive, provider-removal, custom-agent, dashboard, and friendly-export capabilities. Guided onboarding can initialize Git only after explicit consent. One-action task launch uses automatic orchestration, balanced and guided runs pause on readable plans, and the task cockpit presents stages and interventions. Automated validation is green; visual QA is required before final resilience, accessibility, and Windows acceptance testing.

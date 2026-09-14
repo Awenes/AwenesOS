@@ -39,6 +39,12 @@ export class WorkflowService {
   approvals(id: string) {
     return this.runs.approvals(id);
   }
+  plans(id: string) {
+    return this.runs.plans(id);
+  }
+  interventions(id: string) {
+    return this.runs.interventions(id);
+  }
   recoverInterrupted() {
     return this.runs.recoverInterrupted();
   }
@@ -89,6 +95,14 @@ export class WorkflowService {
   }
   async decide(approvalId: string, approved: boolean) {
     const decision = await this.runs.decide(approvalId, approved);
+    if (decision.approval.kind === "plan") {
+      const plan = (await this.runs.plans(decision.run.id)).find((value) => value.status === "awaiting_approval");
+      if (plan) await this.runs.decidePlan(plan.id, approved ? "approved" : "changes_requested");
+      if (!approved) {
+        await this.runs.openIntervention(decision.run.id, "review", "Plan changes requested", "Revise the plan using the developer's feedback before implementation.");
+        return this.runs.setState(decision.run.id, "paused", "plan", "Plan changes requested");
+      }
+    }
     if (!approved)
       return this.runs.setState(
         decision.run.id,

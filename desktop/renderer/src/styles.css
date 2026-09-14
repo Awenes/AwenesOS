@@ -184,7 +184,9 @@ header,
 }
 header {
   margin-bottom: 28px;
+  gap: 10px;
 }
+header > div:first-child { margin-right: auto; }
 h1 {
   font-size: 28px;
   margin: 2px 0;
@@ -853,7 +855,26 @@ textarea:focus { border-color: #8b7aff; box-shadow: 0 0 0 3px #8b7aff24; }
 .onboarding button.done { color: #7ce0ba; background: #102b24; border-color: #205041; }
 .skill-list button.selected { background: #2a2452; border-color: #8b7aff; }
 .optional { color: #727c91; font-size: 10px; font-weight: 500; }
+.permission-choice { grid-template-columns: auto 1fr; align-items: start; padding: 12px; border: 1px solid #2a3244; border-radius: 10px; background: #0f141e; }
+.permission-choice input { margin-top: 2px; }
+.permission-choice small { display: block; margin-top: 4px; color: #7f899d; font-weight: 500; }
+.plan-preview { margin-top: 12px; }
+.plan-preview pre { max-height: 260px; border: 1px solid #2b3448; }
 .form-grid.three { grid-template-columns: repeat(3, 1fr); }
+.segmented { display: inline-flex; border: 1px solid #2c3446; padding: 3px; border-radius: 9px; background: #0d121b; }
+.segmented button { border: 0; background: transparent; color: #8f99ad; padding: 7px 11px; border-radius: 6px; font-size: 11px; }
+.segmented button.selected { background: #28234b; color: #dcd6ff; }
+.cockpit { margin-bottom: 16px; padding: 16px; border: 1px solid #293246; border-radius: 12px; background: linear-gradient(145deg, #111824, #0d121b); }
+.cockpit-head { display: flex; align-items: center; justify-content: space-between; }
+.cockpit-head small { display: block; color: #7f899d; margin-bottom: 4px; }
+.stage-track { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin: 16px 0; }
+.stage-track > div { display: grid; gap: 5px; color: #667086; padding-top: 9px; border-top: 2px solid #293143; }
+.stage-track > div[data-state="passed"] { color: #72dbb2; border-color: #3ab487; }
+.stage-track > div[data-state="running"] { color: #b2a6ff; border-color: #8978ff; }
+.stage-track small { color: inherit; font-size: 10px; }
+.plan-details summary { color: #b5aaff; font-weight: 700; }
+.intervention { margin-top: 10px; padding: 11px; border-radius: 8px; background: #392b13; border: 1px solid #61491e; }
+.intervention p { margin: 5px 0 0; color: #e4bd70; font-size: 11px; }
 button,
 select,
 summary,

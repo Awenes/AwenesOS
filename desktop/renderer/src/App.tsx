@@ -19,6 +19,7 @@ type View =
 const empty: DesktopSnapshot = {
   projects: [],
   tasks: [],
+  archivedTasks: [],
   roles: [],
   providers: [],
   runs: [],
@@ -156,6 +157,7 @@ export function App() {
           >
             {loading ? "Refreshing…" : "Refresh"}
           </button>
+          <button className="ghost" onClick={() => void window.awenes.exportData()}>Export data</button>
         </header>
         {error && (
           <div className="error">
@@ -578,6 +580,7 @@ function Projects({
         "manual" | "approve_push" | "auto_push",
       autonomyMode: String(form.get("autonomy")) as
         "guided" | "balanced" | "autonomous",
+      initializeGit: form.get("initializeGit") === "on",
     });
     setShow(false);
     await refresh();
@@ -614,6 +617,13 @@ function Projects({
                 {choosingFolder ? "Opening…" : "Browse…"}
               </button>
             </div>
+          </label>
+          <label className="check permission-choice">
+            <input type="checkbox" name="initializeGit" />
+            <span>
+              Create a local Git repository if this folder does not have one
+              <small>AwenesOS will run Git init only after you select this option.</small>
+            </span>
           </label>
           <div className="form-grid three">
             <label>
@@ -688,12 +698,14 @@ function Tasks({
   refresh: () => Promise<void>;
 }) {
   const [project, setProject] = useState("all");
+  const [scope, setScope] = useState<"active" | "archived">("active");
   const [show, setShow] = useState(false);
   const [details, setDetails] = useState<any>(null);
+  const sourceTasks = scope === "active" ? data.tasks : data.archivedTasks;
   const filtered =
     project === "all"
-      ? data.tasks
-      : data.tasks.filter((task) => task.projectId === project);
+      ? sourceTasks
+      : sourceTasks.filter((task) => task.projectId === project);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -714,9 +726,21 @@ function Tasks({
     await window.awenes.taskAction({ taskId, action });
     await refresh();
   }
+  async function openTask(taskId: string) {
+    const summary = await window.awenes.taskSummary(taskId);
+    const run = data.runs.find((item) => item.taskId === taskId);
+    setDetails({
+      ...(summary as Record<string, unknown>),
+      workflow: run ? await window.awenes.runDetails(run.id) : null,
+    });
+  }
   return (
     <section className="stack">
       <div className="section-bar">
+        <div className="segmented" aria-label="Task list">
+          <button className={scope === "active" ? "selected" : ""} onClick={() => setScope("active")}>Active</button>
+          <button className={scope === "archived" ? "selected" : ""} onClick={() => setScope("archived")}>Archived ({data.archivedTasks.length})</button>
+        </div>
         <select value={project} onChange={(e) => setProject(e.target.value)}>
           <option value="all">All projects</option>
           {data.projects.map((p) => (
@@ -791,11 +815,12 @@ function Tasks({
                 </small>
               </div>
               <Badge text={pretty(task.status)} />
+              {scope === "archived" && (
+                <button className="small-button" onClick={() => void act(task.id, "restore")}>Restore</button>
+              )}
               <button
                 className="small-button"
-                onClick={async () =>
-                  setDetails(await window.awenes.taskSummary(task.id))
-                }
+                onClick={() => void openTask(task.id)}
               >
                 Details
               </button>
@@ -891,7 +916,7 @@ function Tasks({
                   I updated CRM
                 </button>
               )}
-              <button className="small-button" disabled={["in_progress", "sync_pending"].includes(task.status)} title={["in_progress", "sync_pending"].includes(task.status) ? "Pause or finish active work before archiving" : "Move this task to the archive"} onClick={() => void act(task.id, "archive")}>Archive</button>
+              {scope === "active" && <button className="small-button" disabled={["in_progress", "sync_pending"].includes(task.status)} title={["in_progress", "sync_pending"].includes(task.status) ? "Pause or finish active work before archiving" : "Move this task to the archive"} onClick={() => void act(task.id, "archive")}>Archive</button>}
               <button
                   className="small-button danger"
                   disabled={["in_progress", "sync_pending"].includes(task.status)}
@@ -913,6 +938,34 @@ function Tasks({
       </Panel>
       {details && (
         <Panel title={`Task details · ${details.task.title}`}>
+          {details.workflow && (
+            <div className="cockpit">
+              <div className="cockpit-head">
+                <div>
+                  <small>Workflow</small>
+                  <strong>{details.workflow.run.status === "running" ? "AwenesOS is working" : pretty(details.workflow.run.status)}</strong>
+                </div>
+                <Badge text={pretty(details.workflow.run.currentStage ?? "not started")} />
+              </div>
+              <div className="stage-track">
+                {details.workflow.steps.map((step: any) => (
+                  <div key={step.id} data-state={step.status}>
+                    <span>{step.status === "passed" ? "✓" : step.status === "running" ? "●" : "○"}</span>
+                    <small>{pretty(step.stage)}</small>
+                  </div>
+                ))}
+              </div>
+              {details.workflow.plans?.[0] && (
+                <details className="plan-details" open={details.workflow.plans[0].status === "awaiting_approval"}>
+                  <summary>Plan v{details.workflow.plans[0].version} · {pretty(details.workflow.plans[0].status)}</summary>
+                  <pre>{details.workflow.plans[0].content}</pre>
+                </details>
+              )}
+              {details.workflow.interventions?.filter((item: any) => item.status === "open").map((item: any) => (
+                <div className="intervention" key={item.id}><strong>{item.title}</strong><p>{item.detail}</p></div>
+              ))}
+            </div>
+          )}
           <div className="summary-grid">
             <div>
               <small>Active work</small>
@@ -1227,6 +1280,12 @@ function Approvals({
               <div className="grow">
                 <strong>{pretty(item.kind)} approval</strong>
                 <p>{item.detail}</p>
+                {item.planContent && (
+                  <div className="plan-preview">
+                    <small>Plan version {item.planVersion}</small>
+                    <pre>{item.planContent}</pre>
+                  </div>
+                )}
                 <small>
                   {taskName(
                     data,
@@ -1245,7 +1304,7 @@ function Approvals({
                   await refresh();
                 }}
               >
-                Reject
+                {item.kind === "plan" ? "Request changes" : "Reject"}
               </button>
               <button
                 className="primary"

@@ -29,6 +29,14 @@ export interface DesktopSnapshot {
     status: string;
     updatedAt: Date;
   }>;
+  archivedTasks: Array<{
+    id: string;
+    projectId: string | null;
+    title: string;
+    source: TaskSource;
+    status: string;
+    updatedAt: Date;
+  }>;
   roles: Array<{
     id: string;
     projectId: string | null;
@@ -68,6 +76,8 @@ export interface DesktopSnapshot {
     status: string;
     detail: string;
     requestedAt: Date;
+    planContent?: string;
+    planVersion?: number;
   }>;
   notifications: Array<{
     key: string;
@@ -85,6 +95,7 @@ export interface DesktopApi {
   onActivity(listener: (pendingOperations: number) => void): () => void;
   onFeedback(listener: (feedback: { message: string; tone: "success" | "error" }) => void): () => void;
   snapshot(): Promise<DesktopSnapshot>;
+  exportData(): Promise<string | null>;
   selectProjectDirectory(): Promise<string | null>;
   addProject(input: {
     name: string;
@@ -92,6 +103,7 @@ export interface DesktopApi {
     defaultBranch: string;
     completionPolicy: CompletionPolicy;
     autonomyMode: "guided" | "balanced" | "autonomous";
+    initializeGit: boolean;
   }): Promise<void>;
   captureTask(input: {
     title: string;

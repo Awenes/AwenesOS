@@ -23,6 +23,7 @@ const successMessages: Record<string, string> = {
   "awenes:run:action": "Workflow updated",
   "awenes:git:commit": "Changes committed",
   "awenes:git:push": "Changes pushed",
+  "awenes:data:export": "AwenesOS data exported",
 };
 function publishActivity() {
   for (const listener of activityListeners) listener(pendingOperations);
@@ -55,6 +56,7 @@ const api: DesktopApi = {
     return () => feedbackListeners.delete(listener);
   },
   snapshot: () => invoke("awenes:snapshot"),
+  exportData: () => invoke("awenes:data:export"),
   selectProjectDirectory: () => invoke("awenes:project:select-directory"),
   addProject: (input) => invoke("awenes:project:add", input),
   captureTask: (input) => invoke("awenes:task:capture", input),

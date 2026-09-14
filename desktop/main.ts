@@ -38,6 +38,7 @@ import { LocalEnvironmentInspector } from "../src/infrastructure/environment/loc
 import { GuardedCommandExecutor } from "../src/infrastructure/execution/guarded-command-executor.js";
 import { WorktreeToolHost } from "../src/infrastructure/execution/worktree-tool-host.js";
 import { LocalGitDeliveryDriver } from "../src/infrastructure/git/local-git-delivery-driver.js";
+import { LocalGitRepositoryInitializer } from "../src/infrastructure/git/local-git-repository-initializer.js";
 import { LocalWorktreeDriver } from "../src/infrastructure/git/local-worktree-driver.js";
 import { ApiAgentRunner } from "../src/infrastructure/providers/api-agent-runner.js";
 import { CliAgentRunner } from "../src/infrastructure/providers/cli-agent-runner.js";
@@ -104,6 +105,7 @@ async function start() {
     projectService = new ProjectService(
       projects,
       new LocalEnvironmentInspector(),
+      new LocalGitRepositoryInitializer(),
     ),
     roleService = new AgentRoleService(roles, projects),
     providerService = new ProviderService(
@@ -289,6 +291,7 @@ function registerIpc(window: BrowserWindow, s: Services) {
     const [
       projects,
       tasks,
+      archivedTasks,
       roles,
       providers,
       runs,
@@ -298,6 +301,7 @@ function registerIpc(window: BrowserWindow, s: Services) {
     ] = await Promise.all([
       s.projectService.list(),
       s.taskService.allTasks(),
+      s.taskService.archivedTasks(),
       s.roleService.list(),
       s.providerService.list(),
       s.workflowService.list(),
@@ -306,16 +310,19 @@ function registerIpc(window: BrowserWindow, s: Services) {
       s.taskService.pendingTrackerUpdates(),
     ]);
     const approvals = (
-      await Promise.all(runs.map((run) => s.workflowService.approvals(run.id)))
-    )
-      .flat()
-      .filter((value) => value.status === "pending");
+      await Promise.all(runs.map(async (run) => {
+        const [items, plans] = await Promise.all([s.workflowService.approvals(run.id), s.workflowService.plans(run.id)]);
+        const latest = plans[0];
+        return items.map((value) => value.kind === "plan" && latest ? { ...value, planContent: latest.content, planVersion: latest.version } : value);
+      }))
+    ).flat().filter((value) => value.status === "pending");
     const runSteps = await Promise.all(
       runs.map((run) => s.workflowService.steps(run.id)),
     );
     return {
       projects,
       tasks,
+      archivedTasks,
       roles,
       providers,
       runs: runs.map((run, index) => ({
@@ -330,6 +337,30 @@ function registerIpc(window: BrowserWindow, s: Services) {
       pendingTracker: pendingTracker.length,
     } satisfies DesktopSnapshot;
   });
+  handle("awenes:data:export", async () => {
+    const result = await dialog.showSaveDialog(window, {
+      title: "Export AwenesOS data",
+      defaultPath: `awenes-export-${new Date().toISOString().slice(0, 10)}.json`,
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+    if (result.canceled || !result.filePath) return null;
+    const [projects, tasks, archivedTasks, runs, roles, providers] = await Promise.all([
+      s.projectService.list(), s.taskService.allTasks(), s.taskService.archivedTasks(), s.workflowService.list(), s.roleService.list(), s.providerService.list(),
+    ]);
+    const payload = {
+      format: "AwenesOS export",
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      projects,
+      tasks,
+      archivedTasks,
+      workflowRuns: runs,
+      agentRoles: roles.map(({ promptTemplate: _promptTemplate, ...role }) => role),
+      providers: providers.map(({ command: _command, ...provider }) => provider),
+    };
+    await writeFile(result.filePath, JSON.stringify(payload, null, 2), "utf8");
+    return result.filePath;
+  });
   handle("awenes:project:add", async (input) => {
     const value = z
       .object({
@@ -338,6 +369,7 @@ function registerIpc(window: BrowserWindow, s: Services) {
         defaultBranch: z.string(),
         completionPolicy: CompletionPolicySchema,
         autonomyMode: z.enum(["guided", "balanced", "autonomous"]),
+        initializeGit: z.boolean(),
       })
       .parse(input);
     await s.projectService.register(value);
@@ -509,6 +541,8 @@ function registerIpc(window: BrowserWindow, s: Services) {
       run: await s.workflowService.get(runId),
       steps: await s.workflowService.steps(runId),
       approvals: await s.workflowService.approvals(runId),
+      plans: await s.workflowService.plans(runId),
+      interventions: await s.workflowService.interventions(runId),
       delivery: await s.deliveries.get(runId),
       browserEvidence: await s.browserService.evidence(runId),
     };
@@ -545,7 +579,7 @@ function registerIpc(window: BrowserWindow, s: Services) {
       .parse(input);
     const approval = await s.workflowService.approval(value.approvalId);
     await s.workflowService.decide(value.approvalId, value.approved);
-    if (value.approved && approval.kind === "start")
+    if (value.approved && (approval.kind === "start" || approval.kind === "plan"))
       void runAutomatically(approval.runId, s);
     if (value.approved && approval.kind === "push") {
       const run = await s.workflowService.get(approval.runId);

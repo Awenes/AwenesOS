@@ -36,4 +36,19 @@ describe("project service", () => {
     await expect(service.register({ ...input, name: "Two" })).rejects.toThrow();
     await opened.client.close();
   });
+
+  it("initializes a non-Git folder only after explicit confirmation", async () => {
+    const opened = await openDatabase(":memory:");
+    const calls: string[] = [];
+    const git = {
+      isRepository: async () => false,
+      initialize: async (root: string, branch: string) => { calls.push(`${root}:${branch}`); },
+    };
+    const service = new ProjectService(new ProjectRepository(opened.db), { inspect: async (project) => ({ projectId: project.id, ready: true, checkedAt: new Date(), checks: [] }) }, git);
+    const input = { name: "New app", repositoryRoot: ".", defaultBranch: "main", completionPolicy: "manual" as const };
+    await expect(service.register(input)).rejects.toThrow("not a Git repository");
+    await service.register({ ...input, initializeGit: true });
+    expect(calls).toHaveLength(1);
+    await opened.client.close();
+  });
 });

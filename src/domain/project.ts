@@ -50,6 +50,11 @@ export interface EnvironmentInspector {
   inspect(project: Project): Promise<ReadinessReport>;
 }
 
+export interface GitRepositoryInitializer {
+  isRepository(root: string): Promise<boolean>;
+  initialize(root: string, defaultBranch: string): Promise<void>;
+}
+
 export const NetworkAccessSchema = z.enum(["none", "localhost", "public"]);
 export const ExecutionPolicySchema = z.object({
   networkAccess: NetworkAccessSchema.default("none"),

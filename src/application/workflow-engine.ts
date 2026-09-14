@@ -95,6 +95,22 @@ export class WorkflowEngine {
       );
       if (!result.success)
         return this.runs.setState(runId, "failed", step.stage, result.summary);
+      if (step.stage === "plan") {
+        const requiresApproval = project.autonomyMode !== "autonomous";
+        const plan = await this.runs.createPlan(
+          runId,
+          result.transcript || result.summary,
+          requiresApproval,
+        );
+        if (requiresApproval) {
+          await this.runs.requestApproval(
+            runId,
+            "plan",
+            `Review plan version ${plan.version} before implementation begins.`,
+          );
+          return this.runs.setState(runId, "awaiting_approval", "plan");
+        }
+      }
       const refreshed = await this.runs.steps(runId);
       const next = refreshed.find(
         (value) => value.status === "pending" || value.status === "failed",
