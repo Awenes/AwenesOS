@@ -864,6 +864,11 @@ textarea:focus { border-color: #8b7aff; box-shadow: 0 0 0 3px #8b7aff24; }
 .segmented { display: inline-flex; border: 1px solid #2c3446; padding: 3px; border-radius: 9px; background: #0d121b; }
 .segmented button { border: 0; background: transparent; color: #8f99ad; padding: 7px 11px; border-radius: 6px; font-size: 11px; }
 .segmented button.selected { background: #28234b; color: #dcd6ff; }
+.pagination { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 13px; border-top: 1px solid #252c3b; color: #7f899d; font-size: 11px; }
+.pagination > div { display: flex; align-items: center; gap: 9px; }
+.pagination strong { font-size: 10px; color: #aab2c2; }
+.pagination button { width: 30px; height: 28px; padding: 0; border: 1px solid #30384b; border-radius: 7px; background: #171d29; color: #dbe0ec; }
+.pagination button:hover:not(:disabled) { border-color: #8b7aff; background: #242b3c; }
 .cockpit { margin-bottom: 16px; padding: 16px; border: 1px solid #293246; border-radius: 12px; background: linear-gradient(145deg, #111824, #0d121b); }
 .cockpit-head { display: flex; align-items: center; justify-content: space-between; }
 .cockpit-head small { display: block; color: #7f899d; margin-bottom: 4px; }

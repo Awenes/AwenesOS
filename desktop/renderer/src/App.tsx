@@ -5,6 +5,7 @@ import {
   PROVIDER_MODELS,
   providerModelName,
 } from "../../../src/domain/provider-model";
+import { paginate } from "../../../src/domain/pagination";
 
 type View =
   | "overview"
@@ -203,6 +204,7 @@ function Providers({
   const [verifyingProvider, setVerifyingProvider] = useState<string | null>(
     null,
   );
+  const providerPage = usePagination(data.providers);
   useEffect(() => setModels([PROVIDER_MODELS[kind][0].id]), [kind]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -330,7 +332,7 @@ function Providers({
         </form>
       )}
       <div className="cards">
-        {data.providers.map((provider) => (
+        {providerPage.items.map((provider) => (
           <article className="project-card" key={provider.id}>
             <div className="project-icon">
               {provider.kind === "openai" ? "O" : "C"}
@@ -385,6 +387,7 @@ function Providers({
             copy="API keys are encrypted locally. CLI mode uses the provider tool's own supported login."
           />
         )}
+        <Pagination {...providerPage} label="providers" />
       </div>
     </section>
   );
@@ -556,6 +559,7 @@ function Projects({
   const [show, setShow] = useState(false);
   const [repositoryRoot, setRepositoryRoot] = useState("");
   const [projectNameValue, setProjectNameValue] = useState("");
+  const projectPage = usePagination(data.projects);
   const [choosingFolder, setChoosingFolder] = useState(false);
   async function chooseFolder() {
     setChoosingFolder(true);
@@ -660,7 +664,7 @@ function Projects({
         </form>
       )}
       <div className="cards">
-        {data.projects.map((project) => (
+        {projectPage.items.map((project) => (
           <article className="project-card" key={project.id}>
             <div className="project-icon">
               {project.name.slice(0, 2).toUpperCase()}
@@ -685,6 +689,7 @@ function Projects({
             copy="Register a local Git repository. Awenes only records it; no agent will run automatically."
           />
         )}
+        <Pagination {...projectPage} label="projects" />
       </div>
     </section>
   );
@@ -706,6 +711,7 @@ function Tasks({
     project === "all"
       ? sourceTasks
       : sourceTasks.filter((task) => task.projectId === project);
+  const taskPage = usePagination(filtered, `${scope}:${project}`);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -805,7 +811,7 @@ function Tasks({
       )}
       <Panel title={`${filtered.length} tasks`}>
         {filtered.length ? (
-          filtered.map((task) => (
+          taskPage.items.map((task) => (
             <div className="task-row" key={task.id}>
               <div className="task-status" data-status={task.status} />
               <div className="grow">
@@ -935,6 +941,7 @@ function Tasks({
             copy="Capture work manually or import candidates through the CLI."
           />
         )}
+        <Pagination {...taskPage} label="tasks" />
       </Panel>
       {details && (
         <Panel title={`Task details · ${details.task.title}`}>
@@ -1049,6 +1056,7 @@ function Runs({
   const [busy, setBusy] = useState(false);
   const [executingStage, setExecutingStage] = useState<string | null>(null);
   const [executionSeconds, setExecutionSeconds] = useState(0);
+  const runPage = usePagination(data.runs);
   useEffect(() => {
     if (!executingStage) return;
     setExecutionSeconds(0);
@@ -1135,7 +1143,7 @@ function Runs({
       <div className="grid-two">
         <Panel title="Workflow runs">
           {data.runs.length ? (
-            data.runs.map((run) => (
+            runPage.items.map((run) => (
               <button
                 className={`run-row ${selected === run.id ? "selected" : ""}`}
                 key={run.id}
@@ -1167,6 +1175,7 @@ function Runs({
               copy="Open a task and create a run after configuring its roles and provider."
             />
           )}
+          <Pagination {...runPage} label="runs" />
         </Panel>
         <Panel title="Run inspector">
           {!details ? (
@@ -1271,11 +1280,12 @@ function Approvals({
   data: DesktopSnapshot;
   refresh: () => Promise<void>;
 }) {
+  const approvalPage = usePagination(data.approvals);
   return (
     <section className="stack">
       <Panel title="Approval inbox">
         {data.approvals.length ? (
-          data.approvals.map((item) => (
+          approvalPage.items.map((item) => (
             <div className="approval-card" key={item.id}>
               <div className="grow">
                 <strong>{pretty(item.kind)} approval</strong>
@@ -1326,6 +1336,7 @@ function Approvals({
             copy="Awenes pauses before sensitive delivery actions."
           />
         )}
+        <Pagination {...approvalPage} label="approvals" />
       </Panel>
     </section>
   );
@@ -1338,11 +1349,12 @@ function Notifications({
   data: DesktopSnapshot;
   refresh: () => Promise<void>;
 }) {
+  const notificationPage = usePagination(data.notifications);
   return (
     <section className="stack">
       <Panel title="Notification centre">
         {data.notifications.length ? (
-          data.notifications.map((item) => (
+          notificationPage.items.map((item) => (
             <div className="approval-card" key={item.key}>
               <div className="grow">
                 <strong>{item.title}</strong>
@@ -1381,6 +1393,7 @@ function Notifications({
             copy="Only actionable local reminders appear here."
           />
         )}
+        <Pagination {...notificationPage} label="notifications" />
       </Panel>
     </section>
   );
@@ -1393,6 +1406,7 @@ function Agents({
   data: DesktopSnapshot;
   refresh: () => Promise<void>;
 }) {
+  const rolePage = usePagination(data.roles, undefined, 6);
   return (
     <section className="stack">
       <div className="section-bar">
@@ -1402,7 +1416,7 @@ function Agents({
         <SkillStudio data={data} refresh={refresh} />
       </div>
       <div className="agent-grid">
-        {data.roles.map((role) => (
+        {rolePage.items.map((role) => (
           <article
             className={`agent-card ${role.enabled ? "" : "disabled"}`}
             key={role.id}
@@ -1447,6 +1461,7 @@ function Agents({
             <RoleConfig role={role} data={data} refresh={refresh} />
           </article>
         ))}
+        <Pagination {...rolePage} label="agents" />
       </div>
     </section>
   );
@@ -1912,6 +1927,47 @@ function BrowserConfig({ projectId }: { projectId: string }) {
         </button>
       </form>
     </Panel>
+  );
+}
+
+function usePagination<T>(items: T[], resetKey = "", pageSize = 8) {
+  const [page, setPage] = useState(1);
+  const slice = paginate(items, page, pageSize);
+  useEffect(() => setPage(1), [resetKey]);
+  useEffect(() => setPage(slice.page), [slice.page]);
+  return {
+    ...slice,
+    setPage,
+  };
+}
+
+function Pagination({
+  page,
+  setPage,
+  pageSize,
+  total,
+  totalPages,
+  label,
+}: {
+  page: number;
+  setPage: (page: number | ((current: number) => number)) => void;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  label: string;
+}) {
+  if (total <= pageSize) return null;
+  const first = (page - 1) * pageSize + 1;
+  const last = Math.min(page * pageSize, total);
+  return (
+    <nav className="pagination" aria-label={`${pretty(label)} pagination`}>
+      <span>{first}–{last} of {total} {label}</span>
+      <div>
+        <button aria-label={`Previous ${label} page`} disabled={page === 1} onClick={() => setPage((current) => current - 1)}>←</button>
+        <strong>Page {page} of {totalPages}</strong>
+        <button aria-label={`Next ${label} page`} disabled={page === totalPages} onClick={() => setPage((current) => current + 1)}>→</button>
+      </div>
+    </nav>
   );
 }
 
