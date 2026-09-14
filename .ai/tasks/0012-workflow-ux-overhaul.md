@@ -1,6 +1,6 @@
 # Workflow and UX overhaul
 
-Status: in progress
+Status: awaiting visual QA
 
 Rebuild AwenesOS around the developer journey: add a project, start a task, intervene only when needed, review evidence, approve delivery, and confirm external updates.
 
@@ -27,4 +27,4 @@ Rebuild AwenesOS around the developer journey: add a project, start a task, inte
 
 ## Current checkpoint
 
-Checkpoint 1 has begun with database migration 11 and the task-experience state model. Continue by implementing repositories/services for plans, interventions, archive/restore/delete, and execution leases before wiring renderer screens.
+Checkpoints 1 and 2 are implemented. The desktop UI now exposes operating modes, acceptance criteria, semantic statuses, archive/delete actions, and the dark command-center design system. Automated validation is green; visual QA is required before the guided onboarding and task-cockpit layouts are finalized.

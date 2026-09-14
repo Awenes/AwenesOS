@@ -557,6 +557,8 @@ function Projects({
       defaultBranch: String(form.get("branch")),
       completionPolicy: String(form.get("policy")) as
         "manual" | "approve_push" | "auto_push",
+      autonomyMode: String(form.get("autonomy")) as
+        "guided" | "balanced" | "autonomous",
     });
     setShow(false);
     await refresh();
@@ -594,7 +596,7 @@ function Projects({
               </button>
             </div>
           </label>
-          <div className="form-grid">
+          <div className="form-grid three">
             <label>
               Default branch
               <input name="branch" required defaultValue="main" />
@@ -605,6 +607,14 @@ function Projects({
                 <option value="manual">Preview manually</option>
                 <option value="approve_push">Approve before push</option>
                 <option value="auto_push">Automatic push</option>
+              </select>
+            </label>
+            <label>
+              Operating mode
+              <select name="autonomy" defaultValue="balanced">
+                <option value="guided">Guided · ask at each decision</option>
+                <option value="balanced">Balanced · ask when it matters</option>
+                <option value="autonomous">Autonomous · work until review</option>
               </select>
             </label>
           </div>
@@ -632,6 +642,7 @@ function Projects({
               <div className="tags">
                 <Badge text={project.defaultBranch} />
                 <Badge text={pretty(project.completionPolicy)} />
+                <Badge text={`${pretty(project.autonomyMode)} mode`} />
                 <Badge
                   text={`${data.tasks.filter((t) => t.projectId === project.id).length} tasks`}
                 />
@@ -671,6 +682,7 @@ function Tasks({
       title: String(form.get("title")),
       source: String(form.get("source")) as "manual",
       description: String(form.get("description")),
+      acceptanceCriteria: splitLines(String(form.get("criteria"))),
       projectId: String(form.get("project")) || null,
     });
     setShow(false);
@@ -678,7 +690,7 @@ function Tasks({
   }
   async function act(
     taskId: string,
-    action: "claim" | "start" | "pause" | "resume",
+    action: "claim" | "start" | "pause" | "resume" | "archive" | "restore" | "delete",
   ) {
     await window.awenes.taskAction({ taskId, action });
     await refresh();
@@ -726,6 +738,14 @@ function Tasks({
               name="description"
               rows={3}
               placeholder="What needs to be done?"
+            />
+          </label>
+          <label>
+            Done means <span className="optional">optional · one check per line</span>
+            <textarea
+              name="criteria"
+              rows={3}
+              placeholder={"Tests pass\nValidation errors are clear"}
             />
           </label>
           <div className="form-actions">
@@ -850,6 +870,19 @@ function Tasks({
                   }}
                 >
                   I updated CRM
+                </button>
+              )}
+              {["completed", "rejected", "captured", "assigned", "planned", "paused"].includes(task.status) && (
+                <button className="small-button" onClick={() => void act(task.id, "archive")}>Archive</button>
+              )}
+              {["completed", "rejected", "captured", "assigned", "planned", "paused"].includes(task.status) && (
+                <button
+                  className="small-button danger"
+                  onClick={() => {
+                    if (window.confirm("Remove this task from AwenesOS? Its audit tombstone will be retained.")) void act(task.id, "delete");
+                  }}
+                >
+                  Delete
                 </button>
               )}
             </div>
@@ -1847,7 +1880,15 @@ function Panel({
   );
 }
 function Badge({ text }: { text: string }) {
-  return <span className="badge">{text}</span>;
+  const value = text.toLowerCase();
+  const tone = value.includes("fail") || value.includes("reject")
+    ? "danger"
+    : value.includes("complete") || value.includes("ready") || value.includes("verified")
+      ? "success"
+      : value.includes("pause") || value.includes("pending") || value.includes("approval")
+        ? "warning"
+        : "neutral";
+  return <span className={`badge ${tone}`}>{text}</span>;
 }
 function Empty({ title, copy }: { title: string; copy: string }) {
   return (
@@ -1888,6 +1929,12 @@ function formatCheckedAt(value: Date | string) {
 function split(value: string) {
   return value
     .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+function splitLines(value: string) {
+  return value
+    .split(/\r?\n/)
     .map((item) => item.trim())
     .filter(Boolean);
 }

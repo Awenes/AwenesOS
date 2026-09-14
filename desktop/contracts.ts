@@ -19,6 +19,7 @@ export interface DesktopSnapshot {
     repositoryRoot: string;
     defaultBranch: string;
     completionPolicy: CompletionPolicy;
+    autonomyMode: "guided" | "balanced" | "autonomous";
   }>;
   tasks: Array<{
     id: string;
@@ -89,16 +90,18 @@ export interface DesktopApi {
     repositoryRoot: string;
     defaultBranch: string;
     completionPolicy: CompletionPolicy;
+    autonomyMode: "guided" | "balanced" | "autonomous";
   }): Promise<void>;
   captureTask(input: {
     title: string;
     source: TaskSource;
     description: string;
+    acceptanceCriteria: string[];
     projectId: string | null;
   }): Promise<void>;
   taskAction(input: {
     taskId: string;
-    action: "claim" | "start" | "pause" | "resume";
+    action: "claim" | "start" | "pause" | "resume" | "archive" | "restore" | "delete";
   }): Promise<void>;
   projectReadiness(projectId: string): Promise<unknown>;
   executionPolicy(projectId: string): Promise<ExecutionPolicy>;

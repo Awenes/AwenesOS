@@ -45,6 +45,18 @@ export class TaskService {
   allTasks() {
     return this.repository.list();
   }
+  archivedTasks() {
+    return this.repository.archived();
+  }
+  archive(id: string) {
+    return this.repository.archive(id);
+  }
+  restore(id: string) {
+    return this.repository.restore(id);
+  }
+  delete(id: string) {
+    return this.repository.delete(id);
+  }
   history(id: string) {
     return this.repository.history(id);
   }

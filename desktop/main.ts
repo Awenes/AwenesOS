@@ -337,6 +337,7 @@ function registerIpc(window: BrowserWindow, s: Services) {
         repositoryRoot: z.string(),
         defaultBranch: z.string(),
         completionPolicy: CompletionPolicySchema,
+        autonomyMode: z.enum(["guided", "balanced", "autonomous"]),
       })
       .parse(input);
     await s.projectService.register(value);
@@ -366,6 +367,7 @@ function registerIpc(window: BrowserWindow, s: Services) {
         title: z.string(),
         source: TaskSourceSchema,
         description: z.string(),
+        acceptanceCriteria: z.array(z.string()),
         projectId: z.string().uuid().nullable(),
       })
       .parse(input);
@@ -373,6 +375,7 @@ function registerIpc(window: BrowserWindow, s: Services) {
       title: value.title,
       source: value.source,
       assignmentDescription: value.description,
+      acceptanceCriteria: value.acceptanceCriteria,
       assignedToMe: Boolean(value.projectId),
       occurredAt: new Date(),
     });
@@ -389,7 +392,7 @@ function registerIpc(window: BrowserWindow, s: Services) {
     const value = z
       .object({
         taskId: z.string().uuid(),
-        action: z.enum(["claim", "start", "pause", "resume"]),
+        action: z.enum(["claim", "start", "pause", "resume", "archive", "restore", "delete"]),
       })
       .parse(input);
     await s.taskService[value.action](value.taskId);

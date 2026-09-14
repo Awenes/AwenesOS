@@ -751,3 +751,93 @@ pre {
     grid-template-columns: 1fr;
   }
 }
+
+/* Dark command-center theme */
+:root {
+  color: #e8ecf6;
+  background: #090c14;
+  color-scheme: dark;
+}
+body { background: radial-gradient(circle at 68% -20%, #252052 0, #0d101a 35%, #090c14 72%); }
+.sidebar { background: #080b12; border-right: 1px solid #1e2433; }
+.sidebar nav button:hover,
+.sidebar nav button.active { background: #171c2a; }
+.sidebar-foot { border-color: #202637; }
+main { min-height: 100vh; }
+h1, h2, h3, strong { color: #f5f7fc; }
+.eyebrow { color: #9d8cff; }
+.metric,
+.panel,
+.project-card,
+.agent-card,
+.form-card { background: #121722; border-color: #252c3c; box-shadow: 0 14px 45px #00000028; }
+.activity { background: #171d2a; border-color: #30384b; color: #e5e9f3; box-shadow: 0 12px 30px #0008; }
+.spinner { border-color: #3a4257; border-top-color: #8b7aff; }
+.ghost,
+.small-button,
+.run-actions button,
+.skill-list button { background: #171d29; color: #d8deeb; border-color: #31394d; }
+.ghost:hover,
+.small-button:hover { background: #202739; border-color: #8a79ff; color: #fff; }
+.primary { background: linear-gradient(135deg, #7b68ee, #6657d8); border-color: #8b7aff; box-shadow: 0 6px 18px #6d5dfc2e; }
+.small-button.danger { color: #ff9aa9; border-color: #57303a; }
+.small-button.danger:hover { background: #321b23; border-color: #d45a6f; }
+.advanced,
+.model-picker,
+.summary-grid > div { border-color: #2a3244; background: #0f141e; }
+.advanced summary,
+.panel-head button { color: #a393ff; }
+.row,
+.task-row,
+.approval-card,
+.model { border-color: #252c3b; }
+.run-row { background: transparent; border-color: #252c3b; color: #e7ebf5; }
+.run-row:hover,
+.run-row.selected { background: #1b2030; }
+.badge { background: #272d3d; color: #c7cfdf; }
+.badge.success { background: #12382e; color: #79e3bb; }
+.badge.warning { background: #3b2d14; color: #f6c66f; }
+.badge.danger { background: #3c1c25; color: #ff9bad; }
+.healthy { color: #6ee0b3; }
+.guardrails span { background: #12382e; color: #79e3bb; }
+.guardrails p,
+.section-bar p,
+.project-card p,
+.agent-card > p,
+.approval-card p,
+.row small,
+.task-row small,
+.agent-head small { color: #9099ad; }
+label { color: #bdc5d5; }
+input,
+select,
+textarea { background: #0c111a; border-color: #30384b; color: #eef1f8; }
+input::placeholder,
+textarea::placeholder { color: #657087; }
+input:focus,
+select:focus,
+textarea:focus { border-color: #8b7aff; box-shadow: 0 0 0 3px #8b7aff24; }
+.empty { color: #8f98ab; }
+.empty strong { color: #e6eaf3; }
+.error { background: #321820; border-color: #67303e; color: #ff9aac; }
+.error span { color: #f0b2bd; }
+.warning { background: #352912; color: #f2c66f; }
+.onboarding button { background: #0e131c; border-color: #293143; color: #d4dae7; }
+.onboarding button:hover { border-color: #7667e7; background: #171c2a; }
+.onboarding button.done { color: #7ce0ba; background: #102b24; border-color: #205041; }
+.skill-list button.selected { background: #2a2452; border-color: #8b7aff; }
+.optional { color: #727c91; font-size: 10px; font-weight: 500; }
+.form-grid.three { grid-template-columns: repeat(3, 1fr); }
+button,
+select,
+summary,
+.project-card,
+.task-row { cursor: pointer; }
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+summary:focus-visible { outline: 2px solid #a99bff; outline-offset: 2px; }
+@media (max-width: 1250px) {
+  .form-grid.three { grid-template-columns: 1fr; }
+}
