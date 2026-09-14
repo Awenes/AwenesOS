@@ -33,11 +33,13 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [pendingOperations, setPendingOperations] = useState(0);
   const [error, setError] = useState("");
-  const refresh = async () => {
+  const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
+  const refresh = async (announce = false) => {
     setLoading(true);
     try {
       setSnapshot(await window.awenes.snapshot());
       setError("");
+      if (announce) setToast({ message: "Everything is up to date", tone: "success" });
     } catch (cause) {
       setError(message(cause));
     } finally {
@@ -45,6 +47,12 @@ export function App() {
     }
   };
   useEffect(() => window.awenes.onActivity(setPendingOperations), []);
+  useEffect(() => window.awenes.onFeedback(setToast), []);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 3_200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
   useEffect(() => {
     void refresh();
   }, []);
@@ -85,6 +93,13 @@ export function App() {
         <div className="activity" role="status" aria-live="polite">
           <span className="spinner" />
           Working…
+        </div>
+      )}
+      {toast && (
+        <div className={`toast ${toast.tone}`} role="status" aria-live="polite">
+          <span>{toast.tone === "success" ? "✓" : "!"}</span>
+          {toast.message}
+          <button aria-label="Dismiss notification" onClick={() => setToast(null)}>×</button>
         </div>
       )}
       <aside className="sidebar">
@@ -136,7 +151,7 @@ export function App() {
           </div>
           <button
             className="ghost"
-            onClick={() => void refresh()}
+            onClick={() => void refresh(true)}
             disabled={loading}
           >
             {loading ? "Refreshing…" : "Refresh"}
@@ -538,12 +553,16 @@ function Projects({
 }) {
   const [show, setShow] = useState(false);
   const [repositoryRoot, setRepositoryRoot] = useState("");
+  const [projectNameValue, setProjectNameValue] = useState("");
   const [choosingFolder, setChoosingFolder] = useState(false);
   async function chooseFolder() {
     setChoosingFolder(true);
     try {
       const selected = await window.awenes.selectProjectDirectory();
-      if (selected) setRepositoryRoot(selected);
+      if (selected) {
+        setRepositoryRoot(selected);
+        setProjectNameValue(folderName(selected));
+      }
     } finally {
       setChoosingFolder(false);
     }
@@ -575,7 +594,7 @@ function Projects({
         <form className="form-card" onSubmit={(event) => void submit(event)}>
           <label>
             Project name
-            <input name="name" required placeholder="Customer portal" />
+            <input name="name" required placeholder="Customer portal" value={projectNameValue} onChange={(event) => setProjectNameValue(event.target.value)} />
           </label>
           <label>
             Repository path
@@ -872,19 +891,17 @@ function Tasks({
                   I updated CRM
                 </button>
               )}
-              {["completed", "rejected", "captured", "assigned", "planned", "paused"].includes(task.status) && (
-                <button className="small-button" onClick={() => void act(task.id, "archive")}>Archive</button>
-              )}
-              {["completed", "rejected", "captured", "assigned", "planned", "paused"].includes(task.status) && (
-                <button
+              <button className="small-button" disabled={["in_progress", "sync_pending"].includes(task.status)} title={["in_progress", "sync_pending"].includes(task.status) ? "Pause or finish active work before archiving" : "Move this task to the archive"} onClick={() => void act(task.id, "archive")}>Archive</button>
+              <button
                   className="small-button danger"
+                  disabled={["in_progress", "sync_pending"].includes(task.status)}
+                  title={["in_progress", "sync_pending"].includes(task.status) ? "Pause or finish active work before deleting" : "Remove this task from AwenesOS"}
                   onClick={() => {
                     if (window.confirm("Remove this task from AwenesOS? Its audit tombstone will be retained.")) void act(task.id, "delete");
                   }}
                 >
                   Delete
-                </button>
-              )}
+              </button>
             </div>
           ))
         ) : (
@@ -1937,6 +1954,9 @@ function splitLines(value: string) {
     .split(/\r?\n/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+function folderName(path: string) {
+  return path.replace(/[\\/]+$/, "").split(/[\\/]/).at(-1) ?? path;
 }
 function title(view: View) {
   return (

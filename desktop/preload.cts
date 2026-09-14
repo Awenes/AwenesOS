@@ -4,6 +4,26 @@ import type { DesktopApi } from "./contracts.js";
 
 let pendingOperations = 0;
 const activityListeners = new Set<(pending: number) => void>();
+const feedbackListeners = new Set<(feedback: { message: string; tone: "success" | "error" }) => void>();
+const successMessages: Record<string, string> = {
+  "awenes:project:add": "Project added",
+  "awenes:task:capture": "Task started",
+  "awenes:task:action": "Task updated",
+  "awenes:task:completion": "Completion status updated",
+  "awenes:provider:connect": "Provider connection saved",
+  "awenes:provider:verify": "Provider verified",
+  "awenes:provider:disconnect": "Provider removed",
+  "awenes:role:create": "Agent created",
+  "awenes:role:enabled": "Agent availability updated",
+  "awenes:role:model": "Agent model updated",
+  "awenes:prompt:save": "Prompt version saved",
+  "awenes:prompt:reset": "Prompt reset",
+  "awenes:policy:set": "Safety settings saved",
+  "awenes:approval:decide": "Decision recorded",
+  "awenes:run:action": "Workflow updated",
+  "awenes:git:commit": "Changes committed",
+  "awenes:git:push": "Changes pushed",
+};
 function publishActivity() {
   for (const listener of activityListeners) listener(pendingOperations);
 }
@@ -11,7 +31,13 @@ async function invoke<T>(channel: string, input?: unknown): Promise<T> {
   pendingOperations += 1;
   publishActivity();
   try {
-    return await ipcRenderer.invoke(channel, input);
+    const result = await ipcRenderer.invoke(channel, input);
+    const message = successMessages[channel];
+    if (message) for (const listener of feedbackListeners) listener({ message, tone: "success" });
+    return result;
+  } catch (error) {
+    for (const listener of feedbackListeners) listener({ message: error instanceof Error ? error.message : String(error), tone: "error" });
+    throw error;
   } finally {
     pendingOperations = Math.max(0, pendingOperations - 1);
     publishActivity();
@@ -23,6 +49,10 @@ const api: DesktopApi = {
     activityListeners.add(listener);
     listener(pendingOperations);
     return () => activityListeners.delete(listener);
+  },
+  onFeedback: (listener) => {
+    feedbackListeners.add(listener);
+    return () => feedbackListeners.delete(listener);
   },
   snapshot: () => invoke("awenes:snapshot"),
   selectProjectDirectory: () => invoke("awenes:project:select-directory"),

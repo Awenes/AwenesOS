@@ -83,6 +83,7 @@ export interface DesktopSnapshot {
 
 export interface DesktopApi {
   onActivity(listener: (pendingOperations: number) => void): () => void;
+  onFeedback(listener: (feedback: { message: string; tone: "success" | "error" }) => void): () => void;
   snapshot(): Promise<DesktopSnapshot>;
   selectProjectDirectory(): Promise<string | null>;
   addProject(input: {
