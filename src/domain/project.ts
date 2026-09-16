@@ -63,7 +63,7 @@ export const ExecutionPolicySchema = z.object({
   environmentAllowlist: z.array(z.string().trim().min(1)).default([]),
   commandAllowlist: z
     .array(z.string().trim().min(1))
-    .default(["git", "node", "pnpm"]),
+    .default(["git", "node"]),
   processTimeoutSeconds: z.number().int().min(1).max(3600).default(900),
   requirePushApproval: z.boolean().default(true),
   isolatedBrowserProfile: z.literal(true).default(true),

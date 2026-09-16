@@ -200,12 +200,12 @@ Negative checks:
 Steps:
 
 1. Open Safety and select the first project.
-2. Run **Readiness check**.
+2. Select **Check project setup**.
 3. Repeat with a deliberately invalid project fixture if available.
 
 Expected:
 
-- Results identify repository access, Git, Node, pnpm, worktree support, and browser availability.
+- Results identify repository access, Git, worktree support, browser availability, and any other command that project's own execution policy allows (Node by default; pnpm or anything else only if that project's Allowed commands still include it).
 - Required failed checks make the overall result not ready.
 - Browser absence is reported without pretending browser verification is available.
 - The readiness operation is read-only.

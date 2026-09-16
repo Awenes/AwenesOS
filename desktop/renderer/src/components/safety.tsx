@@ -178,7 +178,7 @@ export function Safety({ data }: { data: DesktopSnapshot }) {
                 ) : (
                   <Empty
                     title="Not Checked Yet"
-                    copy="Run the read-only check to verify Git, Node, pnpm, repository access, and worktree support."
+                    copy="Run the read-only check to verify Git, repository access, worktree support, and any command this project's execution policy allows."
                   />
                 )}
               </Panel>

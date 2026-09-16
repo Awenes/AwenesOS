@@ -1,6 +1,7 @@
 import { access } from "node:fs/promises";
 import { constants } from "node:fs";
 import { execFile } from "node:child_process";
+import { delimiter, join } from "node:path";
 import { promisify } from "node:util";
 import type {
   EnvironmentInspector,
@@ -118,21 +119,40 @@ async function commandCheck(
   args: string[],
   required: boolean,
 ): Promise<ReadinessCheck> {
-  const bareName = !/[\\/.]/.test(command);
-  const candidates = process.platform === "win32" && bareName ? [command, `${command}.cmd`, `${command}.exe`] : [command];
-  let lastError: unknown;
-  for (const candidate of candidates) {
-    try {
-      const { stdout, stderr } = await execute(candidate, args, {
-        timeout: 5000,
-        windowsHide: true,
-      });
-      return { name: command, ready: true, required, detail: (stdout || stderr).trim() };
-    } catch (error) {
-      lastError = error;
-    }
+  const resolved = /[\\/]/.test(command) ? command : await resolveOnPath(command);
+  if (!resolved)
+    return { name: command, ready: false, required, detail: `${command} was not found on this computer's PATH.` };
+  try {
+    const { stdout, stderr } = await execute(resolved, args, {
+      timeout: 5000,
+      windowsHide: true,
+    });
+    return { name: command, ready: true, required, detail: (stdout || stderr).trim() };
+  } catch (error) {
+    return { name: command, ready: false, required, detail: message(error) };
   }
-  return { name: command, ready: false, required, detail: message(lastError) };
+}
+
+// A cheap filesystem scan for the executable instead of repeatedly spawning
+// child processes to probe for it, which is slow (and, under load, flaky)
+// once a command genuinely does not exist anywhere on PATH.
+async function resolveOnPath(command: string): Promise<string | null> {
+  const extensions =
+    process.platform === "win32"
+      ? (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean).concat("")
+      : [""];
+  const directories = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
+  for (const directory of directories)
+    for (const extension of extensions) {
+      const candidate = join(directory, `${command}${extension}`);
+      try {
+        await access(candidate, constants.X_OK);
+        return candidate;
+      } catch {
+        /* try the next extension or directory */
+      }
+    }
+  return null;
 }
 
 function message(error: unknown) {

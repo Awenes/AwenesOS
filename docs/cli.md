@@ -38,7 +38,7 @@ Use `pnpm cli -- <command> --help` for arguments and options.
 
 `projects` lists every registered project.
 
-`project-doctor <projectId>` checks repository access, Git, Node.js, pnpm, and dedicated-worktree support without changing the project.
+`project-doctor <projectId>` checks repository access, Git, dedicated-worktree support, and any other command that project's own execution policy allows (Node by default; pnpm or anything else only if that project's allowlist still includes it), without changing the project.
 
 `project-policy <projectId> <policy>` changes the completion policy and records the change as an append-only event.
 
