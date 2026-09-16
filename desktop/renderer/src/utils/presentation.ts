@@ -67,6 +67,20 @@ export function viewTitle(view: View) {
   }[view];
 }
 
+export function viewDescription(view: View) {
+  return {
+    overview: "Monitor projects, active work, agent runs, and decisions from one place.",
+    projects: "Connect repositories and choose how each project should be delivered.",
+    tasks: "Capture work, assign a project, and move tasks through delivery.",
+    runs: "Inspect agent progress, evidence, validation, and delivery history.",
+    approvals: "Review plans and protected actions waiting for your decision.",
+    agents: "Shape agent responsibilities, instructions, skills, and model assignments.",
+    providers: "Manage the model connections available to your agents.",
+    notifications: "Review important workflow changes and items needing attention.",
+    safety: "Control project access, commands, network boundaries, and browser testing.",
+  }[view];
+}
+
 export function viewIcon(view: View) {
   return {
     overview: "⌂",

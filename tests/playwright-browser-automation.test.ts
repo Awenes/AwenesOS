@@ -21,6 +21,7 @@ describe("PlaywrightBrowserAutomation", () => {
       outputs.push(output);
       const commands = new GuardedCommandExecutor(root, {
         networkAccess: "localhost",
+        autoGrantAgentAccess: true,
         environmentAllowlist: [],
         commandAllowlist: ["node"],
         processTimeoutSeconds: 20,

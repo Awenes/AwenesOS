@@ -18,15 +18,16 @@ Version `0.1.0` is an Electron acceptance candidate. The Tauri migration begins 
 - Tests configured localhost applications in an isolated Chrome or Edge profile.
 - Captures screenshots, traces, assertions, console failures, and failed requests.
 - Supports manual delivery, approval-before-push, and automatic-push project policies.
-- Keeps CRM and SharePoint tracker changes manual and waits for developer confirmation.
 - Tracks active, paused, and total elapsed task time.
-- Produces local notifications for approvals, failures, completed runs, and pending external updates.
+- Keeps task pause/resume state aligned with its workflow run.
+- Supports reversible run archiving and audit-safe run deletion.
+- Produces local notifications for approvals, failures, completed runs, and stalled work.
 
 ## Deliberate v0.1 exclusions
 
 AwenesOS does not currently:
 
-- mutate CRM or SharePoint data automatically;
+- integrate with CRM, SharePoint, or external task-management systems;
 - support remote development environments;
 - continue running after the computer sleeps;
 - provide a cloud-hosted control plane;
@@ -76,27 +77,27 @@ pnpm package:win
 
 1. Open **Projects** and register a local Git repository.
 2. Open **Safety**, select the project, and run its readiness check.
-3. Review the default policy before granting commands, environment variables, localhost, or public-network access.
+3. Review whether agent runtime access should be granted automatically. Git push approval is configured separately.
 4. Open **Providers** and connect OpenAI or Anthropic.
 5. Open **Agents**, assign a ready provider and model to every enabled role, then review prompts and skills.
 6. Open **Tasks**, capture a task, claim it, and create its run.
 7. Approve the exact run snapshot in **Approvals**.
 8. Advance the workflow from **Runs** and inspect each stage's output.
 9. Review browser evidence and the Git diff when applicable.
-10. Complete the required CRM or SharePoint change manually, then confirm it in AwenesOS.
+10. Review the completion evidence and finish the task locally.
 
 ## Desktop areas
 
 | Area          | Purpose                                                                         |
 | ------------- | ------------------------------------------------------------------------------- |
-| Overview      | Setup progress, cross-project activity, and pending manual updates              |
+| Overview      | Setup progress, cross-project activity, workflow history, and approvals         |
 | Projects      | Repository registration and delivery-policy selection                           |
-| Tasks         | Capture, assignment, lifecycle, timing, evidence, and external confirmations    |
+| Tasks         | Capture, assignment, lifecycle, timing, evidence, and local completion          |
 | Runs          | Agent stages, retries, browser evidence, diff review, commit, and push          |
 | Approvals     | Durable developer decisions for sensitive workflow actions                      |
 | Agents        | Roles, provider/model assignments, versioned prompts, and skill snapshots       |
 | Providers     | OpenAI/Anthropic API and experimental CLI connections                           |
-| Notifications | Approval, failure, completion, CRM, tracker, and stale-task reminders           |
+| Notifications | Approval, failure, completion, and stale-task reminders                         |
 | Safety        | Readiness, network policy, allowlists, timeouts, credentials, and browser setup |
 
 ## Core lifecycle
@@ -105,19 +106,17 @@ Tasks follow this local state model:
 
 ```text
 captured → assigned/planned → in_progress ↔ paused
-         → ready_to_complete → sync_pending → completed
+         → ready_to_complete → completed
 ```
 
-A local task is not considered externally complete until the developer confirms the corresponding CRM update. Bug-tracker tasks can additionally require a manual SharePoint tracker confirmation.
-
-Workflow runs are separate from task state. A run can be created, running, awaiting approval, paused, failed, completed, or cancelled. Completing an agent run does not bypass the external task-confirmation rule.
+Workflow runs are separate from task state. A run can be created, running, awaiting approval, paused, failed, completed, or cancelled. The developer reviews the run evidence before finishing the task locally.
 
 ## Safety model
 
 Defaults are intentionally restrictive:
 
 - one writable task worktree per project;
-- no public-network access;
+- provider network and executable access granted automatically when the project enables that option;
 - no localhost access until separately selected;
 - explicit command and environment-variable allowlists;
 - role-based tool access;
@@ -127,7 +126,7 @@ Defaults are intentionally restrictive:
 - no access to the developer's normal browser profile; and
 - durable approval before Git push when required by policy.
 
-API-provider traffic also requires the project's public-network grant. Browser verification requires the separate localhost grant.
+When automatic runtime access is disabled, provider traffic requires a manual public-network grant. Browser verification requires the separate localhost grant. Git push approval is never implied by agent runtime access.
 
 ## Data and privacy
 
@@ -156,7 +155,6 @@ Physical QA remains mandatory before the Tauri migration.
 - [Architecture](docs/architecture.md)
 - [Coding standards](docs/coding-standards.md)
 - [CLI reference](docs/cli.md)
-- [CRM workflow](docs/crm-adapter.md)
 - [Acceptance checkpoint](.ai/checkpoints/0011-electron-v01-acceptance.md)
 
 ## License

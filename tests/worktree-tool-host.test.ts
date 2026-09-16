@@ -19,6 +19,7 @@ describe("WorktreeToolHost role permissions", () => {
     const commands = {} as CommandExecutor;
     const policy = {
       networkAccess: "none" as const,
+      autoGrantAgentAccess: false,
       environmentAllowlist: [],
       commandAllowlist: [],
       processTimeoutSeconds: 30,

@@ -14,7 +14,7 @@ export class ReadlineGuidedIO implements GuidedIO {
 export class GuidedCli {
   constructor(private readonly service: TaskService, private readonly io: GuidedIO, private readonly notifications?: NotificationService) {}
   async run(): Promise<void> {
-    this.io.write("\nAwenes OS — guided work session");
+    this.io.write("\nAwenes OS: guided work session");
     let running = true;
     while (running) {
       try {
@@ -80,7 +80,7 @@ export class GuidedCli {
   }
   private async reviewCrmUpdates() {
     const updates = await this.service.pendingManualCrmUpdates(); if (!updates.length) { this.io.write("\nNo manual CRM updates are pending.\n"); return; }
-    const update = updates[await this.choose("Choose a CRM update", [...updates.map((item) => `${item.desiredStatus}${item.description ? " — completion description ready" : ""}`), "Back"])]; if (!update) return;
+    const update = updates[await this.choose("Choose a CRM update", [...updates.map((item) => `${item.desiredStatus}${item.description ? ": completion description ready" : ""}`), "Back"])]; if (!update) return;
     const summary = await this.service.taskSummary(update.taskId); this.io.write(`\nUpdate the CRM manually:\nTask: ${summary.task.title}\nStatus: ${update.desiredStatus}\n${update.description ? `Description:\n${update.description}\n` : ""}Active duration: ${summary.duration.active}\nPaused duration: ${summary.duration.paused}\n`);
     if (await this.confirm("Have you verified and saved this update in the CRM?")) { const result = await this.service.confirmManualCrmUpdate(update.taskId); this.io.write(result.task.status === "completed" ? "CRM completion confirmed; task is now completed.\n" : "CRM status update confirmed.\n"); }
   }
@@ -127,7 +127,7 @@ export class GuidedCli {
     if (!task) return;
     const events = await this.service.history(task.id);
     this.io.write(`\nHistory for “${task.title}”:`);
-    for (const event of events) this.io.write(`- ${event.occurredAt.toISOString()} — ${event.type}`);
+    for (const event of events) this.io.write(`- ${event.occurredAt.toISOString()}: ${event.type}`);
     this.io.write("");
   }
   private async chooseTask(question: string, tasks: Task[]): Promise<Task | null> {

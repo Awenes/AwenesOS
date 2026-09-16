@@ -8,7 +8,7 @@ import { ProjectRepository } from "../src/infrastructure/repositories/project-re
 import { WorkflowRepository } from "../src/infrastructure/repositories/workflow-repository.js";
 
 describe("notification centre", () => {
-  it("derives, snoozes, and resurfaces an unresolved CRM sync notification", async () => {
+  it("does not surface legacy CRM synchronization failures", async () => {
     const opened = await openDatabase(":memory:");
     const repository = new TaskRepository(opened.db);
     const crm: CrmTaskAdapter = {
@@ -36,18 +36,7 @@ describe("notification centre", () => {
     await tasks.prepareCompletion(task.id, "Done");
     await expect(tasks.complete(task.id)).rejects.toThrow("sync_pending");
     const now = new Date("2026-09-03T10:00:00Z");
-    const notification = (await centre.list(now))[0]!;
-    expect(notification).toMatchObject({
-      kind: "crm_sync_failed",
-      severity: "critical",
-    });
-    await centre.snooze(
-      notification.key,
-      new Date("2026-09-03T11:00:00Z"),
-      now,
-    );
-    expect(await centre.list(new Date("2026-09-03T10:30:00Z"))).toHaveLength(0);
-    expect(await centre.list(new Date("2026-09-03T11:01:00Z"))).toHaveLength(1);
+    expect(await centre.list(now)).toHaveLength(0);
     opened.client.close();
   });
   it("accepts friendly snooze durations", async () => {
@@ -138,19 +127,49 @@ describe("notification centre", () => {
       occurredAt: new Date(),
     });
     await tasks.assignProject(task.id, project.id);
+    await tasks.transition(task.id, "assigned", "planned", "task.claimed");
+    await tasks.transition(task.id, "planned", "in_progress", "task.started");
     const run = await workflows.create(task.id, project.id);
     await workflows.requestApproval(run.id, "start", "Review instructions");
+    await workflows.setState(run.id, "awaiting_approval", null);
     const centre = new NotificationService(tasks, workflows);
     expect(await centre.list()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "workflow_approval_pending",
+          title: "Agent run ready for approval",
+        }),
+      ]),
+    );
+    await workflows.setState(run.id, "failed", "plan", "Provider failed");
+    expect(await centre.list()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "workflow_failed" }),
+      ]),
+    );
+    expect(await centre.list()).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ kind: "workflow_approval_pending" }),
       ]),
     );
     await workflows.setState(run.id, "completed", null);
-    expect(await centre.list()).toEqual(
+    const completedNotifications = await centre.list();
+    expect(completedNotifications.map((item) => item.detail).join(" ")).not.toContain("—");
+    expect(completedNotifications).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ kind: "workflow_completed" }),
+        expect.objectContaining({
+          kind: "workflow_completed",
+          suggestedAction: "Open task review",
+        }),
       ]),
+    );
+    await tasks.setCompletion(task.id, "Reviewed evidence");
+    await tasks.transition(task.id, "in_progress", "ready_to_complete", "task.completion_prepared");
+    expect(await centre.list()).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: "workflow_completed" })]),
+    );
+    expect(await centre.list()).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: "completion_ready" })]),
     );
     opened.client.close();
   });

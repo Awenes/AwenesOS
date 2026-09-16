@@ -58,6 +58,7 @@ export interface GitRepositoryInitializer {
 export const NetworkAccessSchema = z.enum(["none", "localhost", "public"]);
 export const ExecutionPolicySchema = z.object({
   networkAccess: NetworkAccessSchema.default("none"),
+  autoGrantAgentAccess: z.boolean().default(true),
   environmentAllowlist: z.array(z.string().trim().min(1)).default([]),
   commandAllowlist: z
     .array(z.string().trim().min(1))

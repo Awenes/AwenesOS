@@ -11,6 +11,7 @@ import type {
 } from "../src/domain/provider.js";
 import type { BrowserTestConfig } from "../src/domain/browser-test.js";
 import type { SkillSnapshotInput } from "../src/domain/instruction.js";
+import type { NotificationKind } from "../src/domain/notification.js";
 
 export interface DesktopSnapshot {
   projects: Array<{
@@ -69,6 +70,16 @@ export interface DesktopSnapshot {
     updatedAt: Date;
     stepStatus: string | null;
   }>;
+  archivedRuns: Array<{
+    id: string;
+    taskId: string;
+    projectId: string;
+    status: string;
+    currentStage: string | null;
+    error: string | null;
+    updatedAt: Date;
+    stepStatus: string | null;
+  }>;
   approvals: Array<{
     id: string;
     runId: string;
@@ -82,18 +93,22 @@ export interface DesktopSnapshot {
   notifications: Array<{
     key: string;
     taskId: string;
+    kind: NotificationKind;
     severity: string;
     title: string;
     detail: string;
     suggestedAction: string;
   }>;
-  pendingCrm: number;
-  pendingTracker: number;
 }
 
 export interface DesktopApi {
   onActivity(listener: (pendingOperations: number) => void): () => void;
-  onFeedback(listener: (feedback: { message: string; tone: "success" | "error" }) => void): () => void;
+  onFeedback(
+    listener: (feedback: {
+      message: string;
+      tone: "success" | "error";
+    }) => void,
+  ): () => void;
   snapshot(): Promise<DesktopSnapshot>;
   exportData(): Promise<string | null>;
   selectProjectDirectory(): Promise<string | null>;
@@ -114,7 +129,8 @@ export interface DesktopApi {
   }): Promise<void>;
   taskAction(input: {
     taskId: string;
-    action: "claim" | "start" | "pause" | "resume" | "archive" | "restore" | "delete";
+    action:
+      "claim" | "start" | "pause" | "resume" | "archive" | "restore" | "delete";
   }): Promise<void>;
   projectReadiness(projectId: string): Promise<unknown>;
   executionPolicy(projectId: string): Promise<ExecutionPolicy>;
@@ -153,7 +169,7 @@ export interface DesktopApi {
   runDetails(runId: string): Promise<unknown>;
   runAction(input: {
     runId: string;
-    action: "next" | "pause" | "resume" | "cancel";
+    action: "next" | "pause" | "resume" | "cancel" | "archive" | "restore" | "delete";
   }): Promise<void>;
   decideApproval(input: {
     approvalId: string;
@@ -161,9 +177,10 @@ export interface DesktopApi {
   }): Promise<void>;
   taskCompletion(input: {
     taskId: string;
-    action: "prepare" | "finish" | "confirm_crm" | "confirm_tracker";
+    action: "prepare" | "edit" | "finish";
     description?: string;
   }): Promise<void>;
+  taskCompletionDraft(taskId: string): Promise<string>;
   taskSummary(taskId: string): Promise<unknown>;
   gitReview(runId: string): Promise<unknown>;
   gitCommit(input: { runId: string; message: string }): Promise<void>;

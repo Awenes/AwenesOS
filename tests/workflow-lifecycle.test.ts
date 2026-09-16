@@ -64,4 +64,33 @@ describe("workflow lifecycle", () => {
     expect((await value.tasks.get(value.task.id)).deletedAt).toBeInstanceOf(Date);
     value.opened.client.close();
   });
+
+  it("archives, restores, and logically deletes terminal workflow runs", async () => {
+    const value = await fixture();
+    await expect(value.workflows.archive(value.run.id)).rejects.toThrow(
+      "Cancel or finish",
+    );
+    await value.workflows.setState(value.run.id, "cancelled", null);
+    await value.workflows.archive(value.run.id);
+    expect(await value.workflows.list()).toHaveLength(0);
+    expect(await value.workflows.archived()).toHaveLength(1);
+    await value.workflows.restore(value.run.id);
+    expect(await value.workflows.list()).toHaveLength(1);
+    await value.workflows.delete(value.run.id);
+    expect(await value.workflows.list()).toHaveLength(0);
+    expect(await value.workflows.archived()).toHaveLength(0);
+    expect((await value.workflows.get(value.run.id)).deletedAt).toBeInstanceOf(
+      Date,
+    );
+    expect(
+      (await value.workflows.history(value.run.id)).map((event) => event.type),
+    ).toEqual(
+      expect.arrayContaining([
+        "workflow.archived",
+        "workflow.restored",
+        "workflow.deleted",
+      ]),
+    );
+    value.opened.client.close();
+  });
 });

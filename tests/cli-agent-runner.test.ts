@@ -52,6 +52,9 @@ describe("CliAgentRunner", () => {
       timeoutSeconds: 60,
     });
     expect(seen?.args).toContain("workspace-write");
+    expect(seen?.args).toContain(
+      "sandbox_workspace_write.network_access=true",
+    );
     expect(seen?.stdin).toContain("Assigned task");
   });
 });

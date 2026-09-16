@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import type {
   Approval,
   ApprovalKind,
@@ -17,6 +17,7 @@ import {
   workflowInterventions,
   workflowPlans,
   workflowRuns,
+  workflowRunTombstones,
   workflowSteps,
 } from "../db/schema.js";
 
@@ -35,6 +36,8 @@ export class WorkflowRepository {
       startedAt: null,
       completedAt: null,
       error: null,
+      archivedAt: null,
+      deletedAt: null,
     };
     await this.db.insert(workflowRuns).values(run);
     await this.event(run.id, "workflow.created", {}, now);
@@ -51,7 +54,45 @@ export class WorkflowRepository {
     return this.db
       .select()
       .from(workflowRuns)
+      .where(and(isNull(workflowRuns.archivedAt), isNull(workflowRuns.deletedAt)))
       .orderBy(asc(workflowRuns.createdAt));
+  }
+  archived() {
+    return this.db
+      .select()
+      .from(workflowRuns)
+      .where(and(isNotNull(workflowRuns.archivedAt), isNull(workflowRuns.deletedAt)))
+      .orderBy(desc(workflowRuns.archivedAt));
+  }
+  async archive(id: string) {
+    const run = await this.get(id);
+    if (["created", "running", "awaiting_approval", "paused"].includes(run.status))
+      throw new Error("Cancel or finish this run before archiving it");
+    if (run.deletedAt) throw new Error("A deleted run cannot be archived");
+    if (run.archivedAt) return run;
+    const now = new Date();
+    await this.db.update(workflowRuns).set({ archivedAt: now, updatedAt: now }).where(eq(workflowRuns.id, id));
+    await this.event(id, "workflow.archived", {}, now);
+    return this.get(id);
+  }
+  async restore(id: string) {
+    const run = await this.get(id);
+    if (run.deletedAt) throw new Error("A deleted run cannot be restored");
+    if (!run.archivedAt) return run;
+    const now = new Date();
+    await this.db.update(workflowRuns).set({ archivedAt: null, updatedAt: now }).where(eq(workflowRuns.id, id));
+    await this.event(id, "workflow.restored", {}, now);
+    return this.get(id);
+  }
+  async delete(id: string) {
+    const run = await this.get(id);
+    if (["created", "running", "awaiting_approval", "paused"].includes(run.status))
+      throw new Error("Cancel or finish this run before deleting it");
+    if (run.deletedAt) return;
+    const now = new Date();
+    await this.event(id, "workflow.deleted", {}, now);
+    await this.db.update(workflowRuns).set({ deletedAt: now, archivedAt: null, updatedAt: now }).where(eq(workflowRuns.id, id));
+    await this.db.insert(workflowRunTombstones).values({ runId: id, deletedAt: now }).onConflictDoNothing();
   }
   async setState(
     id: string,
@@ -131,6 +172,34 @@ export class WorkflowRepository {
       { stepId: id, stage: row.stage, attempt: row.attempt + 1 },
       now,
     );
+  }
+  async completeStage(runId: string, stage: WorkflowStage, output: string) {
+    const row = await this.db.query.workflowSteps.findFirst({
+      where: and(
+        eq(workflowSteps.runId, runId),
+        eq(workflowSteps.stage, stage),
+      ),
+    });
+    if (!row) throw new Error(`Workflow ${stage} step not found`);
+    if (row.status === "passed") return row as WorkflowStep;
+    const now = new Date();
+    await this.db
+      .update(workflowSteps)
+      .set({
+        status: "passed",
+        output,
+        attempt: row.attempt + 1,
+        startedAt: row.startedAt ?? now,
+        completedAt: now,
+      })
+      .where(eq(workflowSteps.id, row.id));
+    await this.event(
+      runId,
+      "step.passed",
+      { stepId: row.id, stage, attempt: row.attempt + 1 },
+      now,
+    );
+    return (await this.steps(runId)).find((step) => step.id === row.id)!;
   }
   async requestApproval(runId: string, kind: ApprovalKind, detail: string) {
     const value: Approval = {

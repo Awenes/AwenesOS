@@ -256,6 +256,15 @@ export class TaskService {
 
   async complete(id: string): Promise<Task> {
     let task = await this.repository.get(id);
+    if (this.crmMode === "local") {
+      if (task.status !== "ready_to_complete")
+        throw new Error(
+          `Task is not ready to complete; task is ${task.status}`,
+        );
+      if (!task.completionDescription)
+        throw new Error("A completion description is required");
+      return this.repository.markCompleted(id, new Date(), "task.completed");
+    }
     if (this.crmMode === "manual") {
       if (task.status === "ready_to_complete")
         task = await this.repository.transition(
@@ -350,12 +359,6 @@ export class TaskService {
       duration: await this.duration(id, now),
       evidence: await this.repository.evidenceFor(id),
       repository: await this.repository.repositoryMapping(id),
-      crmMapping: await this.repository.mapping(id, this.crm.name),
-      pendingCrmUpdate: await this.repository.pendingManualCrmUpdate(id),
-      pendingTrackerUpdate:
-        (await this.repository.pendingTrackerUpdates()).find(
-          (update) => update.taskId === id,
-        ) ?? null,
     };
   }
 
@@ -376,6 +379,8 @@ export class TaskService {
   ) {
     const task = await this.repository.get(id);
     assertTransition(task.status, to);
+    if (this.crmMode === "local")
+      return this.repository.transition(id, task.status, to, event);
     if (this.crmMode === "manual") {
       const transitioned = await this.repository.transition(
         id,

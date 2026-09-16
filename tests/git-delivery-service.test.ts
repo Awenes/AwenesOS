@@ -28,6 +28,7 @@ describe("GitDeliveryService", () => {
     });
     await tasks.assignProject(task.id, project.id);
     const run = await runs.create(task.id, project.id);
+    await runs.addStep(run.id, 0, "delivery", null, null);
     await projects.saveWorktree({
       taskId: task.id,
       projectId: project.id,
@@ -65,6 +66,11 @@ describe("GitDeliveryService", () => {
     );
     await runs.decide(approval.id, true);
     expect((await service.push(run.id)).status).toBe("completed");
+    expect((await runs.steps(run.id))[0]).toMatchObject({
+      stage: "delivery",
+      status: "passed",
+      output: "Committed and pushed to origin/awenes/task.",
+    });
     expect(calls).toEqual(["commit:feat: finish", "push:origin:awenes/task"]);
     expect((await runs.history(run.id)).map((event) => event.type)).toEqual(
       expect.arrayContaining(["git.reviewed", "git.committed", "git.pushed"]),

@@ -14,6 +14,8 @@ export class CliAgentRunner implements AgentRunner {
     const canWrite = input.capabilities.includes("code");
     const args = openai
       ? [
+          "-c",
+          "sandbox_workspace_write.network_access=true",
           "exec",
           "--model",
           input.modelId,

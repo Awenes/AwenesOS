@@ -16,6 +16,7 @@ describe("GuardedCommandExecutor", () => {
     process.env.AWENES_TEST_SECRET = "hidden";
     const runner = new GuardedCommandExecutor(root, {
       networkAccess: "none",
+      autoGrantAgentAccess: false,
       environmentAllowlist: [],
       commandAllowlist: ["node"],
       processTimeoutSeconds: 5,

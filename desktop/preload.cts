@@ -21,8 +21,11 @@ const successMessages: Record<string, string> = {
   "awenes:policy:set": "Safety settings saved",
   "awenes:approval:decide": "Decision recorded",
   "awenes:run:action": "Workflow updated",
+  "awenes:git:review": "Diff review refreshed",
   "awenes:git:commit": "Changes committed",
   "awenes:git:push": "Changes pushed",
+  "awenes:browser:config": "Browser validation configured",
+  "awenes:browser:run": "Browser validation finished",
   "awenes:data:export": "AwenesOS data exported",
 };
 function publishActivity() {
@@ -91,6 +94,8 @@ const api: DesktopApi = {
     invoke("awenes:approval:decide", input),
   taskCompletion: (input) =>
     invoke("awenes:task:completion", input),
+  taskCompletionDraft: (taskId) =>
+    invoke("awenes:task:completion-draft", taskId),
   taskSummary: (taskId) => invoke("awenes:task:summary", taskId),
   gitReview: (runId) => invoke("awenes:git:review", runId),
   gitCommit: (input) => invoke("awenes:git:commit", input),

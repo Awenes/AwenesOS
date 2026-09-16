@@ -13,14 +13,14 @@
 
 ## 1. Product in plain language
 
-AwenesOS coordinates coding-agent work for developers. A developer registers one or more local Git repositories, connects an AI provider, configures agent roles, captures a task, and starts a staged workflow. Agents work in a separate Git worktree. The developer retains control of approvals, delivery, and external CRM or SharePoint updates.
+AwenesOS coordinates coding-agent work for developers. A developer registers one or more local Git repositories, connects an AI provider, configures agent roles, captures a task, and starts a staged workflow. Agents work in a separate Git worktree. The developer retains control of approvals and Git delivery.
 
 There are two related but independent lifecycles:
 
-- A **task** represents the developer's work item and its timing/external status.
+- A **task** represents the developer's local work item and timing.
 - A **run** represents one staged agent execution for that task.
 
-A completed run does not automatically mean the external task is completed. A task remains pending until the developer confirms the manual CRM update. A bug-tracker task may also wait for SharePoint confirmation.
+A completed run is ready for evidence review. The developer then finishes the task locally; no external task-management confirmation is required.
 
 ## 2. Scope and boundaries
 
@@ -34,17 +34,17 @@ Test these v0.1 capabilities:
 - built-in agent roles and provider/model assignment;
 - prompt versioning, reset, conflicts, and effective preview;
 - built-in, repository, and personal skill snapshots;
-- task lifecycle, duration, and manual external-update flow;
+- task lifecycle, duration, evidence review, and local completion;
 - staged workflow execution and recovery;
 - role, network, worktree, command, environment, retry, turn, and timeout boundaries;
 - isolated localhost browser testing and evidence;
 - manual, approval-before-push, and automatic delivery policies;
-- approval, failure, completion, CRM, tracker, and reminder notifications; and
+- approval, failure, completion, and reminder notifications; and
 - local persistence after restart.
 
 Do not report these deliberate exclusions as defects:
 
-- automatic CRM or SharePoint mutation;
+- CRM, SharePoint, or task-management integration;
 - remote development environments;
 - continued work while the PC is asleep;
 - cloud synchronization or organization administration;
@@ -55,9 +55,9 @@ Do not report these deliberate exclusions as defects:
 
 1. Use disposable local repositories and test accounts only.
 2. Never register a production repository for destructive or delivery testing.
-3. Do not enter production CRM, SharePoint, model-provider, or application credentials.
+3. Do not enter production model-provider or application credentials.
 4. Use an empty disposable Git remote for push tests. Confirm its exact URL before approving a push.
-5. Keep public-network access disabled except during provider tests that require it.
+5. Verify automatic agent runtime access only grants provider networking and the selected provider command.
 6. Do not disable push approval unless specifically executing the automatic-push scenario.
 7. Record the installer checksum before testing.
 8. Preserve screenshots, traces, logs, task IDs, run IDs, and timestamps for every failure.
@@ -88,8 +88,7 @@ API calls can incur provider charges. Use a low-cost test model and a small task
 
 - a disposable remote repository for push testing;
 - a small localhost web application with a health endpoint;
-- a sample bug-tracker CSV for CLI import coverage; and
-- a mock CRM/SharePoint record that will only be updated manually.
+- a sample tracker CSV for legacy CLI import coverage.
 
 ## 5. Acceptance build
 
@@ -128,7 +127,7 @@ Add a minimal application only if browser testing is in scope. Its start command
 | ------------- | -------------------------------------------------------------------------------------------------------- |
 | Overview      | Shows onboarding progress and work across all registered projects                                        |
 | Projects      | Registers repositories; registration alone must not run an agent or modify Git                           |
-| Tasks         | Owns the work-item lifecycle, duration, evidence, and external confirmations                             |
+| Tasks         | Owns the work-item lifecycle, duration, evidence review, and local completion                             |
 | Runs          | Owns staged agent activity, outputs, browser evidence, diff, commit, and push                            |
 | Approvals     | Holds explicit, durable decisions before sensitive transitions                                           |
 | Agents        | Configures role responsibility, model, prompt, skills, and enabled state                                 |
@@ -137,6 +136,7 @@ Add a minimal application only if browser testing is in scope. Its start command
 | Safety        | Controls project readiness, network, commands, environment, timeouts, push approval, and browser testing |
 
 The sidebar should remain visible at normal desktop widths. A visible error banner should appear when an action is rejected.
+Use the sidebar toggle to collapse and expand navigation. The preference should survive an app restart, and collapsed icons must retain accessible names or tooltips. At narrow window widths, long task titles, run errors, notification details, and evidence should wrap within their cards rather than creating horizontal page scrolling. UI copy, including notifications, should not use em dashes.
 
 ## 8. Test execution order
 
@@ -169,7 +169,7 @@ Steps:
 
 Expected:
 
-- Project, active-work, CRM-update, and tracker-update counts are zero.
+- Project, active-work, agent-run, and approval counts are zero.
 - Cards navigate to Projects, Providers, Agents, and Safety.
 - No task or run starts automatically.
 
@@ -327,27 +327,31 @@ Steps:
 Expected:
 
 - Legal controls appear for the current state only.
-- The task follows `captured → planned → in_progress → paused → in_progress → ready_to_complete → sync_pending`.
+- The task follows `captured → planned → in_progress → paused → in_progress → ready_to_complete → completed`.
 - Active, paused, and elapsed durations are plausible and never negative.
-- Finishing locally does not claim the CRM was updated.
-- A manual CRM instruction and notification appear.
+- Finishing records a local completion event.
+- No CRM, SharePoint, or external task-management notification appears.
 
-### QA-011 — Manual CRM and SharePoint confirmation
+### QA-011 — Local completion boundary
 
 Steps:
 
-1. With a task in `sync_pending`, inspect its Details and Notifications.
-2. Pretend to apply the requested update in a disposable external record.
-3. Select **I updated CRM** only after that step.
-4. For a bug-tracker-origin task, confirm the separate SharePoint tracker instruction from Details.
+1. Let an agent run complete while its task is still in progress.
+2. Confirm the run is `completed` while the task is `in_progress` and the task row says **Ready for review**.
+3. Select **Review task →** in Notifications or **Review task completion →** in Runs.
+4. Inspect agent outputs, Git and browser evidence, and the generated completion summary.
+5. Edit and save the review; confirm the task changes to `ready_to_complete` but does not complete yet.
+6. Select **Mark task complete** and confirm, then inspect task history and restart the application.
 
 Expected:
 
-- The task does not reach `completed` before CRM confirmation.
-- Confirmation records an event and removes the pending CRM notification.
-- Bug-tracker work creates a separate tracker reminder.
-- A tracker confirmation fails when no matching pending tracker update exists.
-- AwenesOS never opens or mutates the live CRM/SharePoint service itself.
+- Both entry points open the same task review without searching the task list.
+- The app never equates an agent run finishing with developer acceptance of the task.
+- The task reaches `completed` directly from `ready_to_complete`.
+- History includes `task.completed`.
+- The completed-run reminder disappears after review is saved; all completion reminders disappear after finishing.
+- No external-update action or notification appears.
+- Completion remains durable after restart.
 
 ### QA-012 — Run creation and start approval
 
@@ -397,6 +401,12 @@ Steps:
 5. Configure a short safe timeout and a command that exceeds it.
 
 Expected:
+
+- Pausing or resuming from either Tasks or Runs updates both the task and its active run.
+- A stage finishing after a pause does not silently return the run to Running.
+- Completed, failed, or cancelled runs can be archived, restored, and deleted.
+- Active or paused runs must be cancelled or completed before archival or deletion.
+- Deleted runs disappear from both lists while retaining their audit tombstone.
 
 - Attempts increment and stop after the role's retry limit.
 - Agent tool loops stop at the configured turn limit.
@@ -514,8 +524,6 @@ Generate and inspect each applicable notification:
 - failed run;
 - completed run;
 - completion ready;
-- manual CRM update pending;
-- SharePoint tracker update pending;
 - long-paused task; and
 - active task with no evidence.
 
@@ -606,7 +614,7 @@ Redact API keys, passwords, access tokens, repository secrets, and personal data
 | Severity | Definition                                                                                           | Examples                                                                  |
 | -------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | Blocker  | Prevents acceptance testing or risks uncontrolled external mutation                                  | Installer cannot launch; pushes without approval; writes outside worktree |
-| Critical | Data loss, credential exposure, broken completion invariant, or repeatable security-boundary failure | Plaintext API key; task completes before CRM confirmation; policy bypass  |
+| Critical | Data loss, credential exposure, broken completion invariant, or repeatable security-boundary failure | Plaintext API key; policy bypass                                          |
 | Major    | Core workflow cannot complete but a safe workaround exists                                           | Run cannot resume; browser evidence never saves; provider cannot verify   |
 | Minor    | Localized UX/content defect with no integrity impact                                                 | Misleading label, layout clipping, unclear empty state                    |
 
@@ -644,7 +652,7 @@ The Electron v0.1 release can proceed to the Tauri migration only when:
 - every mandatory test case has an explicit result;
 - no blocker or critical defect remains open;
 - all failed automated checks are resolved or formally accepted;
-- the manual CRM/SharePoint boundary is confirmed;
+- the local completion boundary is confirmed;
 - the worktree and push-approval protections pass on a disposable repository;
 - the tester confirms no normal browser profile was used;
 - installation, restart recovery, persistence, and uninstall pass; and

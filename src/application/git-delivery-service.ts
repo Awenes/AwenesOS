@@ -42,6 +42,11 @@ export class GitDeliveryService {
       throw new Error("Commit the reviewed changes before pushing");
     await this.git.push(worktree.path, remote, worktree.branch);
     await this.deliveries.recordPush(runId, remote);
+    await this.runs.completeStage(
+      runId,
+      "delivery",
+      `Committed and pushed to ${remote}/${worktree.branch}.`,
+    );
     return this.runs.setState(runId, "completed", null);
   }
   private async context(runId: string) {

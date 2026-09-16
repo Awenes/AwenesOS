@@ -10,10 +10,9 @@ const emptySnapshot: DesktopSnapshot = {
   roles: [],
   providers: [],
   runs: [],
+  archivedRuns: [],
   approvals: [],
   notifications: [],
-  pendingCrm: 0,
-  pendingTracker: 0,
 };
 
 export function useDesktopState() {
@@ -28,7 +27,8 @@ export function useDesktopState() {
     try {
       setSnapshot(await window.awenes.snapshot());
       setError("");
-      if (announce) setToast({ message: "Everything is up to date", tone: "success" });
+      if (announce)
+        setToast({ message: "Everything is up to date", tone: "success" });
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -43,9 +43,18 @@ export function useDesktopState() {
     const timer = window.setTimeout(() => setToast(null), 3_200);
     return () => window.clearTimeout(timer);
   }, [toast]);
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    if (!error) return;
+    const timer = window.setTimeout(() => setError(""), 6_000);
+    return () => window.clearTimeout(timer);
+  }, [error]);
+  useEffect(() => {
+    void refresh();
+  }, []);
 
-  const workflowActive = snapshot.runs.some((run) => run.status === "running" && run.stepStatus === "running");
+  const workflowActive = snapshot.runs.some(
+    (run) => run.status === "running" && run.stepStatus === "running",
+  );
   useEffect(() => {
     if (!workflowActive) return;
     const timer = window.setInterval(async () => {
@@ -67,5 +76,14 @@ export function useDesktopState() {
     return () => window.removeEventListener("unhandledrejection", rejected);
   }, []);
 
-  return { snapshot, loading, pendingOperations, error, toast, dismissToast: () => setToast(null), refresh };
+  return {
+    snapshot,
+    loading,
+    pendingOperations,
+    error,
+    toast,
+    dismissToast: () => setToast(null),
+    dismissError: () => setError(""),
+    refresh,
+  };
 }

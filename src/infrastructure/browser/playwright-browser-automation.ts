@@ -43,7 +43,7 @@ export class PlaywrightBrowserAutomation implements BrowserAutomation {
       });
       page.on("requestfailed", (request) =>
         failedRequests.push(
-          `${request.method()} ${request.url()} — ${request.failure()?.errorText ?? "failed"}`,
+          `${request.method()} ${request.url()}: ${request.failure()?.errorText ?? "failed"}`,
         ),
       );
       await context.tracing.start({

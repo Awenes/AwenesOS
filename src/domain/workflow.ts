@@ -51,6 +51,8 @@ export interface WorkflowRun {
   startedAt: Date | null;
   completedAt: Date | null;
   error: string | null;
+  archivedAt: Date | null;
+  deletedAt: Date | null;
 }
 export interface WorkflowStep {
   id: string;

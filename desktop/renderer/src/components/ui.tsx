@@ -24,8 +24,11 @@ export function Pagination({ page, setPage, pageSize, total, totalPages, label }
   );
 }
 
-export function Metric({ label, value, note, tone }: { label: string; value: number; note: string; tone: string }) {
-  return <article className={`metric ${tone}`}><span>{label}</span><strong>{value}</strong><small>{note}</small></article>;
+export function Metric({ label, value, note, tone, onClick }: { label: string; value: number; note: string; tone: string; onClick?: () => void }) {
+  const content = <><span>{label}</span><strong>{value}</strong><small>{note}</small><i aria-hidden="true">→</i></>;
+  return onClick
+    ? <button className={`metric ${tone} interactive`} onClick={onClick}>{content}</button>
+    : <article className={`metric ${tone}`}>{content}</article>;
 }
 
 export function Panel({ title, children, action, onAction }: { title: string; children: ReactNode; action?: string; onAction?: () => void }) {

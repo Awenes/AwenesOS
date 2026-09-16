@@ -1,16 +1,14 @@
 # Product context
 
-Awenes OS reduces work administration so its owner can preserve attention for delivery and learning. Work may arrive at standup or at any point through Teams, meetings, support, CRM, bug trackers, or manual capture.
+Awenes OS reduces work administration so developers can preserve attention for delivery and learning. Work may arrive from any source and is captured directly by the developer.
 
 The first vertical slice is a trustworthy closed loop:
 
-1. Capture an assignment or candidate.
-2. Confirm or claim it.
-3. Record the existing CRM task reference.
-4. Start, pause, and resume execution.
-5. Collect completion evidence.
-6. Draft and edit a completion description.
-7. Tell the user exactly what to update in CRM and wait for confirmation.
-8. Retain event history and generate the next standup.
+1. Capture a task.
+2. Confirm or claim it and associate it with a local project.
+3. Plan and execute it through configured agent roles.
+4. Collect implementation, review, test, and Git evidence.
+5. Let the developer review, commit, and optionally approve a Git push.
+6. Mark the task complete locally and retain its event history.
 
-Bug tracker entries are never assumed to belong to the user. CRM remains the external execution record, but v0.1 does not mutate it: Awenes tracks execution locally, queues manual instructions, and only marks completion after the user confirms the CRM update.
+Awenes OS does not integrate with CRM, SharePoint, or task-management systems in v0.1. Git delivery follows each project's completion policy.

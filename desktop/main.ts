@@ -101,7 +101,7 @@ async function start() {
     vault = new EncryptedSecretVault(
       join(app.getPath("userData"), "secrets.json"),
     );
-  const taskService = new TaskService(tasks, new ManualCrmAdapter(), "manual"),
+  const taskService = new TaskService(tasks, new ManualCrmAdapter(), "local"),
     projectService = new ProjectService(
       projects,
       new LocalEnvironmentInspector(),
@@ -125,6 +125,7 @@ async function start() {
       projects,
       tasks,
       new LocalWorktreeDriver(),
+      new LocalGitRepositoryInitializer(),
     ),
     notificationService = new NotificationService(tasks, runs),
     gitService = new GitDeliveryService(
@@ -220,7 +221,8 @@ async function start() {
   registerIpc(mainWindow, desktopServices);
   await mainWindow.loadURL("awenes://app/index.html");
   for (const run of await workflowService.list()) {
-    if (run.status === "running") void runAutomatically(run.id, desktopServices);
+    if (run.status === "running")
+      void runAutomatically(run.id, desktopServices);
   }
   startNotificationPump(notificationService);
   const capturePath = process.argv
@@ -295,9 +297,8 @@ function registerIpc(window: BrowserWindow, s: Services) {
       roles,
       providers,
       runs,
+      archivedRuns,
       notifications,
-      pendingCrm,
-      pendingTracker,
     ] = await Promise.all([
       s.projectService.list(),
       s.taskService.allTasks(),
@@ -305,19 +306,36 @@ function registerIpc(window: BrowserWindow, s: Services) {
       s.roleService.list(),
       s.providerService.list(),
       s.workflowService.list(),
+      s.workflowService.archived(),
       s.notificationService.list(),
-      s.taskService.pendingManualCrmUpdates(),
-      s.taskService.pendingTrackerUpdates(),
     ]);
     const approvals = (
-      await Promise.all(runs.map(async (run) => {
-        const [items, plans] = await Promise.all([s.workflowService.approvals(run.id), s.workflowService.plans(run.id)]);
-        const latest = plans[0];
-        return items.map((value) => value.kind === "plan" && latest ? { ...value, planContent: latest.content, planVersion: latest.version } : value);
-      }))
-    ).flat().filter((value) => value.status === "pending");
+      await Promise.all(
+        runs.map(async (run) => {
+          const [items, plans] = await Promise.all([
+            s.workflowService.approvals(run.id),
+            s.workflowService.plans(run.id),
+          ]);
+          const latest = plans[0];
+          return items.map((value) =>
+            value.kind === "plan" && latest
+              ? {
+                  ...value,
+                  planContent: latest.content,
+                  planVersion: latest.version,
+                }
+              : value,
+          );
+        }),
+      )
+    )
+      .flat()
+      .filter((value) => value.status === "pending");
     const runSteps = await Promise.all(
       runs.map((run) => s.workflowService.steps(run.id)),
+    );
+    const archivedRunSteps = await Promise.all(
+      archivedRuns.map((run) => s.workflowService.steps(run.id)),
     );
     return {
       projects,
@@ -331,10 +349,14 @@ function registerIpc(window: BrowserWindow, s: Services) {
           runSteps[index]?.find((step) => step.stage === run.currentStage)
             ?.status ?? null,
       })),
+      archivedRuns: archivedRuns.map((run, index) => ({
+        ...run,
+        stepStatus:
+          archivedRunSteps[index]?.find((step) => step.stage === run.currentStage)
+            ?.status ?? null,
+      })),
       approvals,
       notifications,
-      pendingCrm: pendingCrm.length,
-      pendingTracker: pendingTracker.length,
     } satisfies DesktopSnapshot;
   });
   handle("awenes:data:export", async () => {
@@ -344,9 +366,16 @@ function registerIpc(window: BrowserWindow, s: Services) {
       filters: [{ name: "JSON", extensions: ["json"] }],
     });
     if (result.canceled || !result.filePath) return null;
-    const [projects, tasks, archivedTasks, runs, roles, providers] = await Promise.all([
-      s.projectService.list(), s.taskService.allTasks(), s.taskService.archivedTasks(), s.workflowService.list(), s.roleService.list(), s.providerService.list(),
-    ]);
+    const [projects, tasks, archivedTasks, runs, archivedRuns, roles, providers] =
+      await Promise.all([
+        s.projectService.list(),
+        s.taskService.allTasks(),
+        s.taskService.archivedTasks(),
+        s.workflowService.list(),
+        s.workflowService.archived(),
+        s.roleService.list(),
+        s.providerService.list(),
+      ]);
     const payload = {
       format: "AwenesOS export",
       version: 1,
@@ -355,8 +384,13 @@ function registerIpc(window: BrowserWindow, s: Services) {
       tasks,
       archivedTasks,
       workflowRuns: runs,
-      agentRoles: roles.map(({ promptTemplate: _promptTemplate, ...role }) => role),
-      providers: providers.map(({ command: _command, ...provider }) => provider),
+      archivedWorkflowRuns: archivedRuns,
+      agentRoles: roles.map(
+        ({ promptTemplate: _promptTemplate, ...role }) => role,
+      ),
+      providers: providers.map(
+        ({ command: _command, ...provider }) => provider,
+      ),
     };
     await writeFile(result.filePath, JSON.stringify(payload, null, 2), "utf8");
     return result.filePath;
@@ -424,29 +458,56 @@ function registerIpc(window: BrowserWindow, s: Services) {
     const value = z
       .object({
         taskId: z.string().uuid(),
-        action: z.enum(["claim", "start", "pause", "resume", "archive", "restore", "delete"]),
+        action: z.enum([
+          "claim",
+          "start",
+          "pause",
+          "resume",
+          "archive",
+          "restore",
+          "delete",
+        ]),
       })
       .parse(input);
+    const run = await s.workflowService.latestForTask(value.taskId);
+    if (value.action === "pause" && run) {
+      if (!["completed", "cancelled"].includes(run.status))
+        await s.workflowService.pause(run.id);
+      await s.taskService.pause(value.taskId);
+      return;
+    }
+    if (value.action === "resume" && run) {
+      await s.taskService.resume(value.taskId);
+      if (run.status === "paused" || run.status === "failed") {
+        await s.workflowService.resume(run.id);
+        void runAutomatically(run.id, s);
+      }
+      return;
+    }
     await s.taskService[value.action](value.taskId);
   });
   handle("awenes:task:summary", async (input) =>
     s.taskService.taskSummary(z.string().uuid().parse(input)),
   );
+  handle("awenes:task:completion-draft", async (input) =>
+    s.taskService.draftCompletion(z.string().uuid().parse(input)),
+  );
   handle("awenes:task:completion", async (input) => {
     const value = z
       .object({
         taskId: z.string().uuid(),
-        action: z.enum(["prepare", "finish", "confirm_crm", "confirm_tracker"]),
+        action: z.enum(["prepare", "edit", "finish"]),
         description: z.string().optional(),
       })
       .parse(input);
     if (value.action === "prepare")
       await s.taskService.prepareCompletion(value.taskId, value.description);
-    else if (value.action === "finish")
-      await s.taskService.complete(value.taskId);
-    else if (value.action === "confirm_crm")
-      await s.taskService.confirmManualCrmUpdate(value.taskId);
-    else await s.taskService.confirmTrackerUpdate(value.taskId);
+    else if (value.action === "edit")
+      await s.taskService.editCompletion(
+        value.taskId,
+        z.string().trim().min(1).parse(value.description),
+      );
+    else await s.taskService.complete(value.taskId);
   });
   handle("awenes:role:create", async (input) => {
     await s.roleService.create(AgentRoleInputSchema.parse(input));
@@ -537,24 +598,28 @@ function registerIpc(window: BrowserWindow, s: Services) {
   });
   handle("awenes:run:details", async (input) => {
     const runId = z.string().uuid().parse(input);
+    const run = await s.workflowService.get(runId);
     return {
-      run: await s.workflowService.get(runId),
+      run,
       steps: await s.workflowService.steps(runId),
       approvals: await s.workflowService.approvals(runId),
       plans: await s.workflowService.plans(runId),
       interventions: await s.workflowService.interventions(runId),
       delivery: await s.deliveries.get(runId),
       browserEvidence: await s.browserService.evidence(runId),
+      browserConfigured: await s.browserService.isConfigured(run.projectId),
     };
   });
   handle("awenes:run:action", async (input) => {
     const value = z
       .object({
         runId: z.string().uuid(),
-        action: z.enum(["next", "pause", "resume", "cancel"]),
+        action: z.enum(["next", "pause", "resume", "cancel", "archive", "restore", "delete"]),
       })
       .parse(input);
-    if (value.action === "next") {
+    if (value.action === "archive" || value.action === "restore" || value.action === "delete") {
+      await s.workflowService[value.action](value.runId);
+    } else if (value.action === "next") {
       const result = await s.workflowEngine.executeNext(value.runId);
       if (result.status === "running" && result.currentStage === "delivery") {
         const project = await s.projects.get(result.projectId);
@@ -569,8 +634,19 @@ function registerIpc(window: BrowserWindow, s: Services) {
         }
       }
     } else {
-      await s.workflowService[value.action](value.runId);
-      if (value.action === "resume") void runAutomatically(value.runId, s);
+      const run = await s.workflowService.get(value.runId);
+      const task = await s.taskService.taskSummary(run.taskId);
+      if (value.action === "pause") {
+        await s.workflowService.pause(value.runId);
+        if (task.task.status === "in_progress") await s.taskService.pause(run.taskId);
+      } else if (value.action === "resume") {
+        if (task.task.status === "paused") await s.taskService.resume(run.taskId);
+        await s.workflowService.resume(value.runId);
+        void runAutomatically(value.runId, s);
+      } else {
+        await s.workflowService.cancel(value.runId);
+        if (task.task.status === "in_progress") await s.taskService.pause(run.taskId);
+      }
     }
   });
   handle("awenes:approval:decide", async (input) => {
@@ -579,7 +655,10 @@ function registerIpc(window: BrowserWindow, s: Services) {
       .parse(input);
     const approval = await s.workflowService.approval(value.approvalId);
     await s.workflowService.decide(value.approvalId, value.approved);
-    if (value.approved && (approval.kind === "start" || approval.kind === "plan"))
+    if (
+      value.approved &&
+      (approval.kind === "start" || approval.kind === "plan")
+    )
       void runAutomatically(approval.runId, s);
     if (value.approved && approval.kind === "push") {
       const run = await s.workflowService.get(approval.runId);
@@ -601,7 +680,22 @@ function registerIpc(window: BrowserWindow, s: Services) {
     await s.gitService.push(z.string().uuid().parse(input));
   });
   handle("awenes:browser:config", async (input) => {
-    await s.browserService.saveConfig(BrowserTestConfigSchema.parse(input));
+    const config = BrowserTestConfigSchema.parse(input);
+    await s.browserService.saveConfig(config);
+    const policy = await s.projects.executionPolicy(config.projectId);
+    const browserCommands = [
+      config.startCommand,
+      config.setupCommand?.command,
+      config.cleanupCommand?.command,
+    ].filter((command): command is string => Boolean(command));
+    await s.projects.saveExecutionPolicy(config.projectId, {
+      ...policy,
+      networkAccess:
+        policy.networkAccess === "none" ? "localhost" : policy.networkAccess,
+      commandAllowlist: [
+        ...new Set([...policy.commandAllowlist, ...browserCommands]),
+      ],
+    });
   });
   handle("awenes:browser:credential", async (input) => {
     const value = z
@@ -656,13 +750,20 @@ async function assignUnconfiguredRoles(
 
 async function runAutomatically(runId: string, services: Services) {
   if (automaticRuns.has(runId)) return;
-  if (!(await services.workflowService.acquireExecution(runId, executionOwner))) return;
+  if (!(await services.workflowService.acquireExecution(runId, executionOwner)))
+    return;
   automaticRuns.add(runId);
   try {
     for (;;) {
       const run = await services.workflowService.get(runId);
       if (run.status !== "running") return;
-      if (!(await services.workflowService.acquireExecution(runId, executionOwner))) return;
+      if (
+        !(await services.workflowService.acquireExecution(
+          runId,
+          executionOwner,
+        ))
+      )
+        return;
       await services.workflowEngine.executeNext(runId);
     }
   } catch (error) {

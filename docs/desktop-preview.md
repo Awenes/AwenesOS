@@ -6,7 +6,7 @@ The Electron v0.1 desktop application is the primary AwenesOS interface. It stor
 
 - **Overview** — onboarding, multi-project activity, and pending manual updates.
 - **Projects** — local repository registration and delivery policy.
-- **Tasks** — capture, lifecycle actions, duration, evidence, and CRM/SharePoint confirmations.
+- **Tasks** — capture, lifecycle actions, duration, evidence, and local completion.
 - **Runs** — plan, implementation, review, test, browser evidence, and Git delivery.
 - **Approvals** — durable decisions for start, network, credentials, commit, push, and completion gates.
 - **Agents** — provider/model assignments, versioned prompts, effective-instruction preview, and immutable skill snapshots.

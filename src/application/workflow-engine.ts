@@ -70,7 +70,22 @@ export class WorkflowEngine {
     }
     const task = await this.tasks.get(run.taskId);
     const project = await this.projects.get(run.projectId);
-    const policy = await this.projects.executionPolicy(run.projectId);
+    let policy = await this.projects.executionPolicy(run.projectId);
+    if (policy.autoGrantAgentAccess) {
+      const command = provider.command?.trim();
+      const needsNetwork = policy.networkAccess !== "public";
+      const needsCommand = Boolean(
+        command && !policy.commandAllowlist.includes(command),
+      );
+      if (needsNetwork || needsCommand)
+        policy = await this.projects.saveExecutionPolicy(run.projectId, {
+          ...policy,
+          networkAccess: "public",
+          commandAllowlist: command
+            ? [...new Set([...policy.commandAllowlist, command])]
+            : policy.commandAllowlist,
+        });
+    }
     new ExecutionGuard(project.repositoryRoot, policy).assertNetwork("public");
     const worktree = await this.worktrees.create(task.id);
     const snapshot = step.instructionSnapshot as { content?: string } | null;
@@ -93,6 +108,8 @@ export class WorkflowEngine {
         result.success,
         result.transcript || result.summary,
       );
+      const currentRun = await this.runs.get(runId);
+      if (currentRun.status === "paused") return currentRun;
       if (!result.success)
         return this.runs.setState(runId, "failed", step.stage, result.summary);
       if (step.stage === "plan") {

@@ -15,17 +15,6 @@ export class NotificationService {
   async list(now = new Date()): Promise<LocalNotification[]> {
     const candidates: LocalNotification[] = [];
     for (const task of await this.repository.list()) {
-      if (task.status === "sync_pending" && task.syncError)
-        candidates.push(
-          item(
-            task,
-            "crm_sync_failed",
-            "critical",
-            "CRM completion needs attention",
-            task.syncError,
-            "Retry CRM completion sync",
-          ),
-        );
       if (task.status === "ready_to_complete")
         candidates.push(
           item(
@@ -33,8 +22,8 @@ export class NotificationService {
             "completion_ready",
             "action",
             "Completion is ready for review",
-            "The completion description is prepared but has not been synchronized.",
-            "Review and complete the task",
+            "The completion summary is saved. Review it and finish the task locally.",
+            "Open task review",
           ),
         );
       if (task.status === "paused" && age(task, now) >= 4 * HOUR)
@@ -64,42 +53,24 @@ export class NotificationService {
           ),
         );
     }
-    for (const update of await this.repository.pendingManualCrmUpdates())
-      candidates.push({
-        key: `crm_update_pending:${update.id}`,
-        taskId: update.taskId,
-        kind: "crm_update_pending",
-        severity: update.desiredStatus === "Completed" ? "critical" : "action",
-        title: "Manual CRM update pending",
-        detail: `Set the CRM status to ${update.desiredStatus}${update.description ? " and apply the completion description" : ""}.`,
-        suggestedAction: "Update the CRM and confirm it in Awenes",
-        createdAt: update.createdAt,
-      });
-    for (const update of await this.repository.pendingTrackerUpdates())
-      candidates.push({
-        key: `tracker_update_pending:${update.taskId}:${update.createdAt.getTime()}`,
-        taskId: update.taskId,
-        kind: "tracker_update_pending",
-        severity: "action",
-        title: "SharePoint tracker update pending",
-        detail: `${update.reference} should be updated to ${update.suggestedStatus}.`,
-        suggestedAction: "Update SharePoint and confirm it in Awenes",
-        createdAt: update.createdAt,
-      });
     if (this.workflows) {
       for (const run of await this.workflows.list()) {
         const task = await this.repository.get(run.taskId);
         const approvals = await this.workflows.approvals(run.id);
         for (const approval of approvals.filter(
-          (value) => value.status === "pending",
+          (value) =>
+            value.status === "pending" && run.status === "awaiting_approval",
         ))
           candidates.push({
             key: `workflow_approval_pending:${approval.id}`,
             taskId: run.taskId,
             kind: "workflow_approval_pending",
             severity: "action",
-            title: "Agent run needs approval",
-            detail: `${task.title} — ${approval.detail}`,
+            title:
+              approval.kind === "plan"
+                ? "Plan ready for approval"
+                : "Agent run ready for approval",
+            detail: `${task.title}: ${approval.detail}`,
             suggestedAction: "Review it in Approvals",
             createdAt: approval.requestedAt,
           });
@@ -110,19 +81,22 @@ export class NotificationService {
             kind: "workflow_failed",
             severity: "critical",
             title: "Agent run failed",
-            detail: `${task.title} — ${run.error ?? "Review the failed stage evidence."}`,
+            detail: `${task.title}: ${run.error ?? "Review the failed stage evidence."}`,
             suggestedAction: "Inspect or resume the run",
             createdAt: run.updatedAt,
           });
-        if (run.status === "completed")
+        if (
+          run.status === "completed" &&
+          ["in_progress", "paused"].includes(task.status)
+        )
           candidates.push({
             key: `workflow_completed:${run.id}:${run.completedAt?.getTime() ?? run.updatedAt.getTime()}`,
             taskId: run.taskId,
             kind: "workflow_completed",
             severity: "action",
             title: "Agent run completed",
-            detail: `${task.title} — Review the evidence and finish the external task update.`,
-            suggestedAction: "Review task details and update CRM or SharePoint",
+            detail: `${task.title}: The agent run is finished, but the task remains open until you review its evidence and completion summary.`,
+            suggestedAction: "Open task review",
             createdAt: run.completedAt ?? run.updatedAt,
           });
       }
@@ -202,7 +176,7 @@ function item(
     kind,
     severity,
     title,
-    detail: `${task.title} — ${detail}`,
+    detail: `${task.title}: ${detail}`,
     suggestedAction,
     createdAt: task.updatedAt,
   };

@@ -30,6 +30,22 @@ export class WorkflowService {
   list() {
     return this.runs.list();
   }
+  archived() {
+    return this.runs.archived();
+  }
+  async latestForTask(taskId: string) {
+    const runs = await this.runs.list();
+    return [...runs].reverse().find((run) => run.taskId === taskId) ?? null;
+  }
+  archive(id: string) {
+    return this.runs.archive(id);
+  }
+  restore(id: string) {
+    return this.runs.restore(id);
+  }
+  delete(id: string) {
+    return this.runs.delete(id);
+  }
   get(id: string) {
     return this.runs.get(id);
   }
@@ -116,8 +132,14 @@ export class WorkflowService {
         null,
         `Developer rejected ${decision.approval.kind} approval`,
       );
-    if (decision.approval.kind === "completion")
+    if (decision.approval.kind === "completion") {
+      await this.runs.completeStage(
+        decision.run.id,
+        "delivery",
+        "Delivery reviewed and completed manually by the developer.",
+      );
       return this.runs.setState(decision.run.id, "completed", null);
+    }
     const stage =
       decision.approval.kind === "start" ? "plan" : decision.run.currentStage;
     return this.runs.setState(decision.run.id, "running", stage);

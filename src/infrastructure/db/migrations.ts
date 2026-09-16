@@ -115,6 +115,29 @@ export const databaseMigrations: DatabaseMigration[] = [{
     `CREATE INDEX workflow_interventions_run_status_idx ON workflow_interventions(run_id, status)`,
     `CREATE TABLE task_tombstones (task_id TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)`
   ]
+}, {
+  version: 12,
+  name: "workflow_run_archive_and_delete",
+  statements: [
+    `ALTER TABLE workflow_runs ADD COLUMN archived_at INTEGER`,
+    `ALTER TABLE workflow_runs ADD COLUMN deleted_at INTEGER`,
+    `CREATE TABLE workflow_run_tombstones (run_id TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)`
+  ]
+}, {
+  version: 13,
+  name: "reconcile_completed_delivery_steps",
+  statements: [
+    `INSERT INTO workflow_events (id, run_id, type, data, occurred_at)
+     SELECT lower(hex(randomblob(16))), ws.run_id, 'step.reconciled', json_object('stepId', ws.id, 'stage', 'delivery', 'reason', 'completed_run_backfill'), CAST(strftime('%s','now') AS INTEGER) * 1000
+     FROM workflow_steps ws
+     JOIN workflow_runs wr ON wr.id = ws.run_id
+     WHERE ws.stage = 'delivery' AND ws.status <> 'passed' AND wr.status = 'completed'`,
+    `UPDATE workflow_steps
+     SET status = 'passed', output = 'Delivery completed before step-state reconciliation.', attempt = attempt + 1,
+         started_at = COALESCE(started_at, CAST(strftime('%s','now') AS INTEGER) * 1000),
+         completed_at = COALESCE(completed_at, CAST(strftime('%s','now') AS INTEGER) * 1000)
+     WHERE stage = 'delivery' AND status <> 'passed' AND run_id IN (SELECT id FROM workflow_runs WHERE status = 'completed')`
+  ]
 }];
 
 export const currentDatabaseVersion = databaseMigrations.at(-1)?.version ?? 0;

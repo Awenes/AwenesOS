@@ -21,9 +21,11 @@ try {
 
 function launch(executable, screenshot, database) {
   return new Promise((resolveExit, reject) => {
+    const desktopEnvironment = { ...process.env, AWENES_DB_PATH: database };
+    delete desktopEnvironment.ELECTRON_RUN_AS_NODE;
     const child = spawn(executable, [".", `capture=${screenshot}`], {
       cwd: process.cwd(),
-      env: { ...process.env, AWENES_DB_PATH: database },
+      env: desktopEnvironment,
       stdio: "inherit",
       windowsHide: true,
     });

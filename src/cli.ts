@@ -25,6 +25,7 @@ import { LocalEnvironmentInspector } from "./infrastructure/environment/local-en
 import { ProjectRepository } from "./infrastructure/repositories/project-repository.js";
 import { WorktreeService } from "./application/worktree-service.js";
 import { LocalWorktreeDriver } from "./infrastructure/git/local-worktree-driver.js";
+import { LocalGitRepositoryInitializer } from "./infrastructure/git/local-git-repository-initializer.js";
 import { AgentRoleService } from "./application/agent-role-service.js";
 import { AgentRoleInputSchema } from "./domain/agent-role.js";
 import { AgentRoleRepository } from "./infrastructure/repositories/agent-role-repository.js";
@@ -36,7 +37,7 @@ const notifications = new NotificationService(repository);
 const reporting = new ReportingService(repository);
 const projectRepository = new ProjectRepository(db);
 const projectService = new ProjectService(projectRepository, new LocalEnvironmentInspector());
-const worktrees = new WorktreeService(projectRepository, repository, new LocalWorktreeDriver());
+const worktrees = new WorktreeService(projectRepository, repository, new LocalWorktreeDriver(), new LocalGitRepositoryInitializer());
 const roleRepository = new AgentRoleRepository(db);
 const roles = new AgentRoleService(roleRepository, projectRepository);
 await roles.initializeBuiltIns();

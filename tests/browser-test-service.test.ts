@@ -38,6 +38,7 @@ describe("BrowserTestService", () => {
     });
     await projects.saveExecutionPolicy(project.id, {
       networkAccess: "localhost",
+      autoGrantAgentAccess: true,
       environmentAllowlist: [],
       commandAllowlist: ["pnpm"],
       processTimeoutSeconds: 30,
@@ -119,7 +120,9 @@ describe("BrowserTestService", () => {
       assertions: [{ type: "status" as const, value: 200 }],
       browserExecutable: "chrome",
     };
+    expect(await service.isConfigured(project.id)).toBe(false);
     await service.saveConfig(config);
+    expect(await service.isConfigured(project.id)).toBe(true);
     await service.saveCredential(project.id, "password", "secret");
     expect((await service.verify(run.id, project.id, "C:\\work")).passed).toBe(
       true,

@@ -80,6 +80,14 @@ describe("WorkflowService", () => {
     expect((await service.decide(completion.id, true)).status).toBe(
       "completed",
     );
+    expect(
+      (await service.steps(created.run.id)).find(
+        (step) => step.stage === "delivery",
+      ),
+    ).toMatchObject({
+      status: "passed",
+      output: "Delivery reviewed and completed manually by the developer.",
+    });
     opened.client.close();
   });
 });

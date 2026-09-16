@@ -6,14 +6,55 @@ import {
   providerModelName,
 } from "../../../src/domain/provider-model";
 import { ActivityIndicator, Toast } from "./components/feedback";
-import { Badge, Empty, Guard, Metric, Pagination, Panel } from "./components/ui";
+import {
+  Badge,
+  Empty,
+  Guard,
+  Metric,
+  Pagination,
+  Panel,
+} from "./components/ui";
 import { useDesktopState } from "./hooks/use-desktop-state";
 import { usePagination } from "./hooks/use-pagination";
-import { folderName, formatCheckedAt, navigation, pretty, projectName, splitCommaSeparated, splitLines, taskName, type View, viewIcon, viewTitle } from "./utils/presentation";
+import {
+  folderName,
+  formatCheckedAt,
+  navigation,
+  pretty,
+  projectName,
+  splitCommaSeparated,
+  splitLines,
+  taskName,
+  type View,
+  viewDescription,
+  viewIcon,
+  viewTitle,
+} from "./utils/presentation";
 
 export function App() {
   const [view, setView] = useState<View>("overview");
-  const { snapshot, loading, pendingOperations, error, toast, dismissToast, refresh } = useDesktopState();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = window.localStorage.getItem("awenes.sidebar.collapsed");
+    return saved === null ? window.matchMedia("(max-width: 1080px)").matches : saved === "true";
+  });
+  useEffect(() => {
+    window.localStorage.setItem("awenes.sidebar.collapsed", String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+  const [taskReview, setTaskReview] = useState<{ id: string; request: number } | null>(null);
+  function openTaskReview(id: string) {
+    setTaskReview({ id, request: Date.now() });
+    setView("tasks");
+  }
+  const {
+    snapshot,
+    loading,
+    pendingOperations,
+    error,
+    toast,
+    dismissToast,
+    dismissError,
+    refresh,
+  } = useDesktopState();
   const active = snapshot.tasks.filter((task) =>
     [
       "planned",
@@ -23,68 +64,131 @@ export function App() {
       "sync_pending",
     ].includes(task.status),
   );
+  const navigationGroups = [
+    { label: "Workspace", items: navigation.slice(0, 5) },
+    { label: "Configure", items: navigation.slice(5) },
+  ];
+  const navigationCount = (id: View) => {
+    if (id === "tasks") return active.length;
+    if (id === "runs")
+      return snapshot.runs.filter((run) =>
+        ["running", "paused", "awaiting_approval"].includes(run.status),
+      ).length;
+    if (id === "approvals") return snapshot.approvals.length;
+    return 0;
+  };
   return (
-    <div className="shell" aria-busy={loading || pendingOperations > 0}>
-      <a className="skip-link" href="#main-content">Skip to main content</a>
+    <div
+      className={`shell${sidebarCollapsed ? " sidebar-collapsed" : ""}`}
+      aria-busy={loading || pendingOperations > 0}
+    >
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
       <ActivityIndicator visible={loading || pendingOperations > 0} />
       <Toast value={toast} dismiss={dismissToast} />
       <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-mark">A</span>
-          <div>
-            <strong>AwenesOS</strong>
-            <small>Developer command center</small>
+        <div className="sidebar-head">
+          <div className="brand">
+            <span className="brand-mark">A</span>
+            <div className="brand-copy">
+              <strong>AwenesOS</strong>
+              <small>Developer command center</small>
+            </div>
           </div>
+          <button
+            type="button"
+            className="sidebar-toggle"
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!sidebarCollapsed}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() => setSidebarCollapsed((value) => !value)}
+          >
+            {sidebarCollapsed ? "»" : "«"}
+          </button>
         </div>
         <nav aria-label="Primary navigation">
-          {navigation.map(([id, label]) => (
-            <button
-              key={id}
-              className={view === id ? "active" : ""}
-              aria-current={view === id ? "page" : undefined}
-              onClick={() => setView(id)}
-            >
-              <span>{viewIcon(id)}</span>
-              {label}
-              {id === "approvals" && snapshot.approvals.length > 0 ? (
-                <em>{snapshot.approvals.length}</em>
-              ) : null}
-            </button>
+          {navigationGroups.map((group) => (
+            <div className="nav-group" key={group.label}>
+              <small>{group.label}</small>
+              {group.items.map(([id, label]) => {
+                const count = navigationCount(id);
+                return (
+                  <button
+                    key={id}
+                    className={view === id ? "active" : ""}
+                    aria-current={view === id ? "page" : undefined}
+                    aria-label={sidebarCollapsed ? label : undefined}
+                    title={sidebarCollapsed ? label : undefined}
+                    onClick={() => setView(id)}
+                  >
+                    <span aria-hidden="true">{viewIcon(id)}</span>
+                    <span className="nav-label">{label}</span>
+                    {count > 0 ? <em>{count}</em> : null}
+                  </button>
+                );
+              })}
+            </div>
           ))}
         </nav>
         <div className="sidebar-foot">
           <span className="status-dot" />
-          Local engine online
+          <span className="sidebar-status-text">Local engine online</span>
           <small>{snapshot.projects.length} projects connected</small>
         </div>
       </aside>
       <main id="main-content" tabIndex={-1}>
         <header>
-          <div>
+          <div className="page-heading">
             <p className="eyebrow">LOCAL-FIRST WORKSPACE</p>
             <h1>{viewTitle(view)}</h1>
+            <p className="page-description">{viewDescription(view)}</p>
           </div>
-          <button
-            className="ghost"
-            onClick={() => void refresh(true)}
-            disabled={loading}
-          >
-            {loading ? "Refreshing…" : "Refresh"}
-          </button>
-          <button type="button" className="ghost" onClick={() => void window.awenes.exportData()}>Export data</button>
+          <div className="header-actions">
+            {view === "overview" && (
+              <button className="primary" onClick={() => setView("tasks")}>
+                + New task
+              </button>
+            )}
+            <button
+              className="ghost"
+              onClick={() => void refresh(true)}
+              disabled={loading}
+            >
+              {loading ? "Refreshing…" : "Refresh"}
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => void window.awenes.exportData()}
+            >
+              Export data
+            </button>
+          </div>
         </header>
         {error && (
           <div className="error" role="alert">
             <strong>Something needs attention</strong>
             <span>{error}</span>
+            <button
+              type="button"
+              aria-label="Dismiss error"
+              onClick={dismissError}
+            >
+              ×
+            </button>
           </div>
         )}
         {view === "overview" && (
           <Overview data={snapshot} active={active} navigate={setView} />
         )}
         {view === "projects" && <Projects data={snapshot} refresh={refresh} />}
-        {view === "tasks" && <Tasks data={snapshot} refresh={refresh} />}
-        {view === "runs" && <Runs data={snapshot} refresh={refresh} />}
+        {view === "tasks" && (
+          <Tasks data={snapshot} refresh={refresh} reviewTarget={taskReview} />
+        )}
+        {view === "runs" && (
+          <Runs data={snapshot} refresh={refresh} reviewTask={openTaskReview} />
+        )}
         {view === "approvals" && (
           <Approvals data={snapshot} refresh={refresh} />
         )}
@@ -93,7 +197,7 @@ export function App() {
           <Providers data={snapshot} refresh={refresh} />
         )}
         {view === "notifications" && (
-          <Notifications data={snapshot} refresh={refresh} />
+          <Notifications data={snapshot} refresh={refresh} reviewTask={openTaskReview} />
         )}
         {view === "safety" && <Safety data={snapshot} />}
       </main>
@@ -186,9 +290,10 @@ function Providers({
           ) : (
             <>
               <p className="field-help">
-                Use this option only if you already use {kind === "openai" ? "Codex" : "Claude"}
-                {" "}from a terminal on this computer. AwenesOS will reuse that
-                sign-in; it will not open a new login window.
+                Use this option only if you already use{" "}
+                {kind === "openai" ? "Codex" : "Claude"} from a terminal on this
+                computer. AwenesOS will reuse that sign-in; it will not open a
+                new login window.
               </p>
               <details className="advanced">
                 <summary>Advanced: CLI location</summary>
@@ -205,7 +310,8 @@ function Providers({
                 <small>
                   Keep the default. AwenesOS searches your Windows PATH and
                   supported Codex or Claude installation folders automatically.
-                  Enter a complete executable path only for a custom installation.
+                  Enter a complete executable path only for a custom
+                  installation.
                 </small>
               </details>
             </>
@@ -324,24 +430,28 @@ function Overview({
           value={data.projects.length}
           note="Local repositories"
           tone="blue"
+          onClick={() => navigate("projects")}
         />
         <Metric
           label="Active work"
           value={active.length}
           note="Across all projects"
           tone="violet"
+          onClick={() => navigate("tasks")}
         />
         <Metric
-          label="CRM updates"
-          value={data.pendingCrm}
-          note="Awaiting confirmation"
+          label="Agent runs"
+          value={data.runs.length}
+          note="Workflow history"
           tone="amber"
+          onClick={() => navigate("runs")}
         />
         <Metric
-          label="Tracker updates"
-          value={data.pendingTracker}
-          note="Manual SharePoint steps"
+          label="Approvals"
+          value={data.approvals.length}
+          note="Waiting for you"
           tone="green"
+          onClick={() => navigate("approvals")}
         />
       </div>
       <div className="grid-two">
@@ -404,7 +514,7 @@ function Overview({
           />
           <Guard
             title="Evidence before completion"
-            copy="Tasks stay open until external confirmation."
+            copy="Tasks close only after evidence and your chosen delivery gate."
           />
         </div>
       </Panel>
@@ -514,7 +624,13 @@ function Projects({
         <form className="form-card" onSubmit={(event) => void submit(event)}>
           <label>
             Project name
-            <input name="name" required placeholder="Customer portal" value={projectNameValue} onChange={(event) => setProjectNameValue(event.target.value)} />
+            <input
+              name="name"
+              required
+              placeholder="Customer portal"
+              value={projectNameValue}
+              onChange={(event) => setProjectNameValue(event.target.value)}
+            />
           </label>
           <label>
             Repository path
@@ -539,7 +655,9 @@ function Projects({
             <input type="checkbox" name="initializeGit" />
             <span>
               Create a local Git repository if this folder does not have one
-              <small>AwenesOS will run Git init only after you select this option.</small>
+              <small>
+                AwenesOS will run Git init only after you select this option.
+              </small>
             </span>
           </label>
           <div className="form-grid three">
@@ -560,7 +678,9 @@ function Projects({
               <select name="autonomy" defaultValue="balanced">
                 <option value="guided">Guided · ask at each decision</option>
                 <option value="balanced">Balanced · ask when it matters</option>
-                <option value="autonomous">Autonomous · work until review</option>
+                <option value="autonomous">
+                  Autonomous · work until review
+                </option>
               </select>
             </label>
           </div>
@@ -611,14 +731,18 @@ function Projects({
 function Tasks({
   data,
   refresh,
+  reviewTarget,
 }: {
   data: DesktopSnapshot;
   refresh: () => Promise<void>;
+  reviewTarget: { id: string; request: number } | null;
 }) {
   const [project, setProject] = useState("all");
   const [scope, setScope] = useState<"active" | "archived">("active");
   const [show, setShow] = useState(false);
   const [details, setDetails] = useState<any>(null);
+  const [completionDraft, setCompletionDraft] = useState("");
+  const [reviewBusy, setReviewBusy] = useState(false);
   const sourceTasks = scope === "active" ? data.tasks : data.archivedTasks;
   const filtered =
     project === "all"
@@ -640,7 +764,8 @@ function Tasks({
   }
   async function act(
     taskId: string,
-    action: "claim" | "start" | "pause" | "resume" | "archive" | "restore" | "delete",
+    action:
+      "claim" | "start" | "pause" | "resume" | "archive" | "restore" | "delete",
   ) {
     await window.awenes.taskAction({ taskId, action });
     await refresh();
@@ -648,17 +773,70 @@ function Tasks({
   async function openTask(taskId: string) {
     const summary = await window.awenes.taskSummary(taskId);
     const run = data.runs.find((item) => item.taskId === taskId);
+    const task = (summary as { task: { status: string; completionDescription: string | null } }).task;
+    setCompletionDraft(
+      task.status === "ready_to_complete"
+        ? task.completionDescription ?? ""
+        : ["in_progress", "paused"].includes(task.status)
+          ? await window.awenes.taskCompletionDraft(taskId)
+          : "",
+    );
     setDetails({
       ...(summary as Record<string, unknown>),
       workflow: run ? await window.awenes.runDetails(run.id) : null,
     });
+    window.requestAnimationFrame(() =>
+      document.getElementById("task-review")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  }
+  useEffect(() => {
+    if (!reviewTarget) return;
+    setProject("all");
+    setScope("active");
+    void openTask(reviewTarget.id);
+  }, [reviewTarget]);
+  async function saveReview() {
+    if (!details || !completionDraft.trim()) return;
+    setReviewBusy(true);
+    try {
+      await window.awenes.taskCompletion({
+        taskId: details.task.id,
+        action: details.task.status === "ready_to_complete" ? "edit" : "prepare",
+        description: completionDraft.trim(),
+      });
+      await refresh();
+      await openTask(details.task.id);
+    } finally {
+      setReviewBusy(false);
+    }
+  }
+  async function finishReview() {
+    if (!details || !window.confirm("Mark this task complete locally? Review the evidence and summary first.")) return;
+    setReviewBusy(true);
+    try {
+      await window.awenes.taskCompletion({ taskId: details.task.id, action: "finish" });
+      await refresh();
+      await openTask(details.task.id);
+    } finally {
+      setReviewBusy(false);
+    }
   }
   return (
     <section className="stack">
       <div className="section-bar">
         <div className="segmented" aria-label="Task list">
-          <button className={scope === "active" ? "selected" : ""} onClick={() => setScope("active")}>Active</button>
-          <button className={scope === "archived" ? "selected" : ""} onClick={() => setScope("archived")}>Archived ({data.archivedTasks.length})</button>
+          <button
+            className={scope === "active" ? "selected" : ""}
+            onClick={() => setScope("active")}
+          >
+            Active
+          </button>
+          <button
+            className={scope === "archived" ? "selected" : ""}
+            onClick={() => setScope("archived")}
+          >
+            Archived ({data.archivedTasks.length})
+          </button>
         </div>
         <select value={project} onChange={(e) => setProject(e.target.value)}>
           <option value="all">All projects</option>
@@ -685,7 +863,9 @@ function Tasks({
           <label>
             Project
             <select name="project" required defaultValue="">
-              <option value="" disabled>Choose project</option>
+              <option value="" disabled>
+                Choose project
+              </option>
               {data.projects.map((p) => (
                 <option value={p.id} key={p.id}>
                   {p.name}
@@ -703,7 +883,8 @@ function Tasks({
             />
           </label>
           <label>
-            Done means <span className="optional">optional · one check per line</span>
+            Done means{" "}
+            <span className="optional">optional · one check per line</span>
             <textarea
               name="criteria"
               rows={3}
@@ -733,9 +914,21 @@ function Tasks({
                   {projectName(data, task.projectId)} · {pretty(task.source)}
                 </small>
               </div>
-              <Badge text={pretty(task.status)} />
+              <Badge
+                text={
+                  data.runs.some((run) => run.taskId === task.id && run.status === "completed") &&
+                  ["in_progress", "paused"].includes(task.status)
+                    ? "Ready for review"
+                    : pretty(task.status)
+                }
+              />
               {scope === "archived" && (
-                <button className="small-button" onClick={() => void act(task.id, "restore")}>Restore</button>
+                <button
+                  className="small-button"
+                  onClick={() => void act(task.id, "restore")}
+                >
+                  Restore
+                </button>
               )}
               <button
                 className="small-button"
@@ -743,6 +936,12 @@ function Tasks({
               >
                 Details
               </button>
+              {data.runs.some((run) => run.taskId === task.id && run.status === "completed") &&
+                ["in_progress", "paused", "ready_to_complete"].includes(task.status) && (
+                  <button className="primary" onClick={() => void openTask(task.id)}>
+                    Review & finish
+                  </button>
+                )}
               {task.projectId &&
                 !data.runs.some((run) => run.taskId === task.id) &&
                 ["planned", "in_progress", "paused"].includes(task.status) && (
@@ -788,7 +987,8 @@ function Tasks({
                   Resume
                 </button>
               )}
-              {["in_progress", "paused"].includes(task.status) && (
+              {["in_progress", "paused"].includes(task.status) &&
+                !data.runs.some((run) => run.taskId === task.id && run.status === "completed") && (
                 <button
                   className="small-button"
                   onClick={async () => {
@@ -807,7 +1007,8 @@ function Tasks({
                   Prepare completion
                 </button>
               )}
-              {task.status === "ready_to_complete" && (
+              {task.status === "ready_to_complete" &&
+                !data.runs.some((run) => run.taskId === task.id && run.status === "completed") && (
                 <button
                   className="primary"
                   onClick={async () => {
@@ -821,30 +1022,40 @@ function Tasks({
                   Finish locally
                 </button>
               )}
-              {task.status === "sync_pending" && (
+              {scope === "active" && (
                 <button
-                  className="primary"
-                  onClick={async () => {
-                    await window.awenes.taskCompletion({
-                      taskId: task.id,
-                      action: "confirm_crm",
-                    });
-                    await refresh();
-                  }}
+                  className="small-button"
+                  disabled={["in_progress", "sync_pending"].includes(
+                    task.status,
+                  )}
+                  title={
+                    ["in_progress", "sync_pending"].includes(task.status)
+                      ? "Pause or finish active work before archiving"
+                      : "Move this task to the archive"
+                  }
+                  onClick={() => void act(task.id, "archive")}
                 >
-                  I updated CRM
+                  Archive
                 </button>
               )}
-              {scope === "active" && <button className="small-button" disabled={["in_progress", "sync_pending"].includes(task.status)} title={["in_progress", "sync_pending"].includes(task.status) ? "Pause or finish active work before archiving" : "Move this task to the archive"} onClick={() => void act(task.id, "archive")}>Archive</button>}
               <button
-                  className="small-button danger"
-                  disabled={["in_progress", "sync_pending"].includes(task.status)}
-                  title={["in_progress", "sync_pending"].includes(task.status) ? "Pause or finish active work before deleting" : "Remove this task from AwenesOS"}
-                  onClick={() => {
-                    if (window.confirm("Remove this task from AwenesOS? Its audit tombstone will be retained.")) void act(task.id, "delete");
-                  }}
-                >
-                  Delete
+                className="small-button danger"
+                disabled={["in_progress", "sync_pending"].includes(task.status)}
+                title={
+                  ["in_progress", "sync_pending"].includes(task.status)
+                    ? "Pause or finish active work before deleting"
+                    : "Remove this task from AwenesOS"
+                }
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "Remove this task from AwenesOS? Its audit tombstone will be retained.",
+                    )
+                  )
+                    void act(task.id, "delete");
+                }}
+              >
+                Delete
               </button>
             </div>
           ))
@@ -857,33 +1068,74 @@ function Tasks({
         <Pagination {...taskPage} label="tasks" />
       </Panel>
       {details && (
+        <div id="task-review">
         <Panel title={`Task details · ${details.task.title}`}>
+          {details.workflow?.run.status === "completed" &&
+            details.task.status !== "completed" && (
+              <div className="completion-review">
+                <div className="completion-review-head">
+                  <Badge text="Agent run complete" />
+                  <strong>Your review is the final step</strong>
+                </div>
+                <p>
+                  The agents have finished, but this task remains open until you review the evidence,
+                  save a completion summary, and choose to mark it complete.
+                </p>
+              </div>
+            )}
           {details.workflow && (
             <div className="cockpit">
               <div className="cockpit-head">
                 <div>
                   <small>Workflow</small>
-                  <strong>{details.workflow.run.status === "running" ? "AwenesOS is working" : pretty(details.workflow.run.status)}</strong>
+                  <strong>
+                    {details.workflow.run.status === "running"
+                      ? "AwenesOS is working"
+                      : pretty(details.workflow.run.status)}
+                  </strong>
                 </div>
-                <Badge text={pretty(details.workflow.run.currentStage ?? "not started")} />
+                <Badge
+                  text={pretty(
+                    details.workflow.run.currentStage ?? "not started",
+                  )}
+                />
               </div>
               <div className="stage-track">
                 {details.workflow.steps.map((step: any) => (
                   <div key={step.id} data-state={step.status}>
-                    <span>{step.status === "passed" ? "✓" : step.status === "running" ? "●" : "○"}</span>
+                    <span>
+                      {step.status === "passed"
+                        ? "✓"
+                        : step.status === "running"
+                          ? "●"
+                          : "○"}
+                    </span>
                     <small>{pretty(step.stage)}</small>
                   </div>
                 ))}
               </div>
               {details.workflow.plans?.[0] && (
-                <details className="plan-details" open={details.workflow.plans[0].status === "awaiting_approval"}>
-                  <summary>Plan v{details.workflow.plans[0].version} · {pretty(details.workflow.plans[0].status)}</summary>
+                <details
+                  className="plan-details"
+                  open={
+                    details.workflow.plans[0].status === "awaiting_approval"
+                  }
+                >
+                  <summary>
+                    Plan v{details.workflow.plans[0].version} ·{" "}
+                    {pretty(details.workflow.plans[0].status)}
+                  </summary>
                   <pre>{details.workflow.plans[0].content}</pre>
                 </details>
               )}
-              {details.workflow.interventions?.filter((item: any) => item.status === "open").map((item: any) => (
-                <div className="intervention" key={item.id}><strong>{item.title}</strong><p>{item.detail}</p></div>
-              ))}
+              {details.workflow.interventions
+                ?.filter((item: any) => item.status === "open")
+                .map((item: any) => (
+                  <div className="intervention" key={item.id}>
+                    <strong>{item.title}</strong>
+                    <p>{item.detail}</p>
+                  </div>
+                ))}
             </div>
           )}
           <div className="summary-grid">
@@ -913,45 +1165,74 @@ function Tasks({
               <small>{item.value}</small>
             </div>
           ))}
-          {details.pendingCrmUpdate && (
-            <div className="approval-card">
-              <div className="grow">
-                <strong>Manual CRM update required</strong>
-                <p>
-                  {details.pendingCrmUpdate.description ||
-                    details.pendingCrmUpdate.desiredStatus}
-                </p>
-              </div>
+          {details.workflow?.run.status === "completed" && (
+            <div className="completion-evidence">
+              <h3>Agent evidence</h3>
+              {details.workflow.steps
+                .filter((step: any) => step.output)
+                .map((step: any) => (
+                  <details key={step.id}>
+                    <summary>{pretty(step.stage)} · {pretty(step.status)}</summary>
+                    <pre>{step.output}</pre>
+                  </details>
+                ))}
+              {details.workflow.delivery?.review && (
+                <details>
+                  <summary>Git diff review</summary>
+                  <pre>{details.workflow.delivery.review.diff || "No uncommitted changes in this worktree."}</pre>
+                </details>
+              )}
+              {details.workflow.browserEvidence?.length > 0 && (
+                <details>
+                  <summary>Browser validation ({details.workflow.browserEvidence.length})</summary>
+                  <pre>{JSON.stringify(details.workflow.browserEvidence, null, 2)}</pre>
+                </details>
+              )}
+              {!details.evidence.length && (
+                <p className="muted">No separate task evidence has been recorded. Inspect the agent outputs before completing this task.</p>
+              )}
             </div>
           )}
-          {details.pendingTrackerUpdate && (
-            <div className="approval-card">
-              <div className="grow">
-                <strong>Update the live SharePoint tracker</strong>
-                <p>
-                  Set this item to {details.pendingTrackerUpdate.desiredStatus},
-                  then confirm here.
-                </p>
+          {details.workflow?.run.status === "completed" &&
+            ["in_progress", "paused", "ready_to_complete"].includes(details.task.status) && (
+              <div className="completion-review">
+                <h3>Completion summary</h3>
+                <p>Review and edit this draft. Saving it does not mark the task complete.</p>
+                <label>
+                  What was completed and verified?
+                  <textarea
+                    rows={8}
+                    value={completionDraft}
+                    onChange={(event) => setCompletionDraft(event.target.value)}
+                  />
+                </label>
+                <div className="form-actions">
+                  <button
+                    className="ghost"
+                    disabled={reviewBusy || !completionDraft.trim()}
+                    onClick={() => void saveReview()}
+                  >
+                    {details.task.status === "ready_to_complete" ? "Save changes" : "Save review"}
+                  </button>
+                  <button
+                    className="primary"
+                    disabled={reviewBusy || details.task.status !== "ready_to_complete" ||
+                      completionDraft.trim() !== (details.task.completionDescription ?? "").trim()}
+                    title={details.task.status !== "ready_to_complete"
+                      ? "Save the completion review first"
+                      : "Save any edits before finishing"}
+                    onClick={() => void finishReview()}
+                  >
+                    Mark task complete
+                  </button>
+                </div>
               </div>
-              <button
-                className="primary"
-                onClick={async () => {
-                  await window.awenes.taskCompletion({
-                    taskId: details.task.id,
-                    action: "confirm_tracker",
-                  });
-                  setDetails(await window.awenes.taskSummary(details.task.id));
-                  await refresh();
-                }}
-              >
-                I updated tracker
-              </button>
-            </div>
-          )}
+            )}
           <button className="ghost" onClick={() => setDetails(null)}>
             Close details
           </button>
         </Panel>
+        </div>
       )}
     </section>
   );
@@ -960,16 +1241,26 @@ function Tasks({
 function Runs({
   data,
   refresh,
+  reviewTask,
 }: {
   data: DesktopSnapshot;
   refresh: () => Promise<void>;
+  reviewTask: (taskId: string) => void;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [details, setDetails] = useState<any>(null);
   const [busy, setBusy] = useState(false);
+  const [scope, setScope] = useState<"active" | "archived">("active");
   const [executingStage, setExecutingStage] = useState<string | null>(null);
   const [executionSeconds, setExecutionSeconds] = useState(0);
-  const runPage = usePagination(data.runs);
+  const visibleRuns = scope === "active" ? data.runs : data.archivedRuns;
+  const runPage = usePagination(visibleRuns);
+  const selectedProject = data.projects.find(
+    (project) => project.id === details?.run?.projectId,
+  );
+  const automatedDelivery =
+    selectedProject?.completionPolicy !== undefined &&
+    selectedProject.completionPolicy !== "manual";
   useEffect(() => {
     if (!executingStage) return;
     setExecutionSeconds(0);
@@ -985,16 +1276,29 @@ function Runs({
   }
   async function action(
     runId: string,
-    action: "next" | "pause" | "resume" | "cancel",
+    action: "next" | "pause" | "resume" | "cancel" | "archive" | "restore" | "delete",
   ) {
     setBusy(true);
-    if (action === "next") setExecutingStage(details?.run.currentStage ?? "stage");
+    if (action === "next")
+      setExecutingStage(details?.run.currentStage ?? "stage");
     try {
       await window.awenes.runAction({ runId, action });
       await refresh();
       await open(runId);
     } finally {
       setExecutingStage(null);
+      setBusy(false);
+    }
+  }
+  async function remove(runId: string, action: "archive" | "restore" | "delete") {
+    if (action === "delete" && !window.confirm("Delete this run? Its audit tombstone will be retained.")) return;
+    setBusy(true);
+    try {
+      await window.awenes.runAction({ runId, action });
+      setSelected(null);
+      setDetails(null);
+      await refresh();
+    } finally {
       setBusy(false);
     }
   }
@@ -1055,7 +1359,11 @@ function Runs({
     <section className="stack">
       <div className="grid-two">
         <Panel title="Workflow runs">
-          {data.runs.length ? (
+          <div className="segmented">
+            <button className={scope === "active" ? "active" : ""} onClick={() => { setScope("active"); setSelected(null); setDetails(null); }}>Active</button>
+            <button className={scope === "archived" ? "active" : ""} onClick={() => { setScope("archived"); setSelected(null); setDetails(null); }}>Archived</button>
+          </div>
+          {visibleRuns.length ? (
             runPage.items.map((run) => (
               <button
                 className={`run-row ${selected === run.id ? "selected" : ""}`}
@@ -1098,7 +1406,28 @@ function Runs({
             />
           ) : (
             <>
+              {details.run.status === "completed" &&
+                data.tasks.some((task) =>
+                  task.id === details.run.taskId && task.status !== "completed",
+                ) && (
+                  <div className="completion-review">
+                    <strong>Agent run complete · Task still open</strong>
+                    <p>Review the evidence and completion summary before marking the task complete.</p>
+                    <button className="primary" onClick={() => reviewTask(details.run.taskId)}>
+                      Review task completion →
+                    </button>
+                  </div>
+                )}
               <div className="run-actions">
+                {scope === "active" && ["failed", "completed", "cancelled"].includes(details.run.status) && (
+                  <button className="ghost" disabled={busy} onClick={() => void remove(details.run.id, "archive")}>Archive</button>
+                )}
+                {scope === "archived" && (
+                  <button className="ghost" disabled={busy} onClick={() => void remove(details.run.id, "restore")}>Restore</button>
+                )}
+                {["failed", "completed", "cancelled"].includes(details.run.status) && (
+                  <button className="danger" disabled={busy} onClick={() => void remove(details.run.id, "delete")}>Delete</button>
+                )}
                 {details.run.status === "failed" &&
                   /Network access denied|Command is not allowed/.test(
                     details.run.error ?? "",
@@ -1125,16 +1454,22 @@ function Runs({
                     : `Run ${pretty(details.run.currentStage ?? "next")} stage`}
                 </button>
                 <button
-                  disabled={busy}
+                  disabled={busy || !["running", "awaiting_approval"].includes(details.run.status)}
                   onClick={() => void action(details.run.id, "pause")}
                 >
                   Pause
                 </button>
                 <button
-                  disabled={busy}
+                  disabled={busy || !["paused", "failed"].includes(details.run.status)}
                   onClick={() => void action(details.run.id, "resume")}
                 >
                   Resume
+                </button>
+                <button
+                  disabled={busy || ["completed", "cancelled"].includes(details.run.status)}
+                  onClick={() => void action(details.run.id, "cancel")}
+                >
+                  Cancel
                 </button>
               </div>
               {details.steps.map((step: any) => (
@@ -1153,29 +1488,72 @@ function Runs({
               ))}
               <div className="run-actions">
                 <button
+                  disabled={busy || !details.browserConfigured}
+                  title={
+                    details.browserConfigured
+                      ? "Run the saved localhost browser validation"
+                      : "Configure localhost browser testing in Safety first"
+                  }
                   onClick={() =>
                     void window.awenes
                       .runBrowserTest(details.run.id)
                       .then(() => open(details.run.id))
                   }
                 >
-                  Run browser test
+                  {details.browserConfigured
+                    ? "Run browser test"
+                    : "Browser test not configured"}
                 </button>
-                <button onClick={() => void git(details.run.id, "review")}>
+                <button
+                  disabled={busy}
+                  onClick={() => void git(details.run.id, "review")}
+                >
                   Review diff
                 </button>
-                <button onClick={() => void git(details.run.id, "commit")}>
-                  Commit
-                </button>
-                <button onClick={() => void git(details.run.id, "push")}>
-                  Push after approval
-                </button>
+                {automatedDelivery && (
+                  <>
+                    <button
+                      disabled={busy || !details.delivery?.review?.status}
+                      title={
+                        details.delivery?.review?.status
+                          ? "Commit the reviewed changes"
+                          : "Review a non-empty diff before committing"
+                      }
+                      onClick={() => void git(details.run.id, "commit")}
+                    >
+                      Commit
+                    </button>
+                    <button
+                      disabled={busy || !details.delivery?.commitSha}
+                      title={
+                        details.delivery?.commitSha
+                          ? "Push the approved commit"
+                          : "Commit the reviewed changes before pushing"
+                      }
+                      onClick={() => void git(details.run.id, "push")}
+                    >
+                      Push after approval
+                    </button>
+                  </>
+                )}
               </div>
+              {!details.browserConfigured && (
+                <p className="muted">
+                  Browser validation becomes available after its localhost
+                  settings are saved in Safety.
+                </p>
+              )}
+              {!automatedDelivery && (
+                <p className="muted">
+                  This project uses manual delivery. Review remains available,
+                  while you control Git commit and push outside AwenesOS.
+                </p>
+              )}
               {details.delivery?.review && (
                 <pre>
-                  {details.delivery.review.diffStat}
-                  {"\n"}
-                  {details.delivery.review.diff}
+                  {details.delivery.review.status
+                    ? `${details.delivery.review.diffStat}\n${details.delivery.review.diff}`
+                    : "No uncommitted changes were found in this task worktree."}
                 </pre>
               )}
             </>
@@ -1258,9 +1636,11 @@ function Approvals({
 function Notifications({
   data,
   refresh,
+  reviewTask,
 }: {
   data: DesktopSnapshot;
   refresh: () => Promise<void>;
+  reviewTask: (taskId: string) => void;
 }) {
   const notificationPage = usePagination(data.notifications);
   return (
@@ -1274,6 +1654,11 @@ function Notifications({
                 <p>{item.detail}</p>
                 <small>{item.suggestedAction}</small>
               </div>
+              {["workflow_completed", "completion_ready"].includes(item.kind) && (
+                <button className="primary" onClick={() => reviewTask(item.taskId)}>
+                  Review task →
+                </button>
+              )}
               <button
                 className="ghost"
                 onClick={async () => {
@@ -1671,6 +2056,23 @@ function Safety({ data }: { data: DesktopSnapshot }) {
           <>
             <div className="grid-two">
               <Panel title="Execution permissions">
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={policy.autoGrantAgentAccess}
+                    onChange={(e) =>
+                      setPolicy({
+                        ...policy,
+                        autoGrantAgentAccess: e.target.checked,
+                      })
+                    }
+                  />
+                  Automatically grant access required by agent runs
+                </label>
+                <small>
+                  Allows provider network access and the connected provider
+                  command before a run. Git push approval remains separate.
+                </small>
                 <label>
                   Network access
                   <select
@@ -1720,7 +2122,9 @@ function Safety({ data }: { data: DesktopSnapshot }) {
                     onChange={(e) =>
                       setPolicy({
                         ...policy,
-                        environmentAllowlist: splitCommaSeparated(e.target.value),
+                        environmentAllowlist: splitCommaSeparated(
+                          e.target.value,
+                        ),
                       })
                     }
                   />

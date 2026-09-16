@@ -56,7 +56,7 @@ const allowed: Record<TaskStatus, readonly TaskStatus[]> = {
   planned: ["in_progress", "rejected"],
   in_progress: ["paused", "ready_to_complete"],
   paused: ["in_progress", "ready_to_complete"],
-  ready_to_complete: ["sync_pending"],
+  ready_to_complete: ["sync_pending", "completed"],
   sync_pending: ["completed", "sync_pending"],
   completed: [],
   rejected: []

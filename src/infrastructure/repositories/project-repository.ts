@@ -34,6 +34,11 @@ export class ProjectRepository {
 
   history(projectId: string) { return this.db.select().from(projectEvents).where(eq(projectEvents.projectId, projectId)).orderBy(asc(projectEvents.occurredAt)); }
 
+  async recordRepositoryInitialized(projectId: string) {
+    await this.get(projectId);
+    await this.event(projectId, "project.repository_initialized", {});
+  }
+
   async executionPolicy(projectId: string): Promise<ExecutionPolicy> {
     await this.get(projectId);
     const row = await this.db.query.projectExecutionPolicies.findFirst({ where: eq(projectExecutionPolicies.projectId, projectId) });

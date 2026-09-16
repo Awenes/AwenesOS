@@ -32,6 +32,9 @@ export class BrowserTestService {
   saveConfig(input: BrowserTestConfig) {
     return this.repository.saveConfig(BrowserTestConfigSchema.parse(input));
   }
+  async isConfigured(projectId: string) {
+    return Boolean(await this.repository.config(projectId));
+  }
   async saveCredential(projectId: string, key: string, value: string) {
     await this.projects.get(projectId);
     if (!key.trim() || !value)
