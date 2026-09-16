@@ -55,15 +55,15 @@ export function folderName(path: string) {
 
 export function viewTitle(view: View) {
   return {
-    overview: "Command center",
+    overview: "Command Center",
     projects: "Projects",
-    tasks: "Task workspace",
-    runs: "Workflow runs",
-    approvals: "Approval inbox",
-    agents: "Agent roles",
-    providers: "Model providers",
+    tasks: "Task Workspace",
+    runs: "Workflow Runs",
+    approvals: "Approval Inbox",
+    agents: "Agent Roles",
+    providers: "Model Providers",
     notifications: "Notifications",
-    safety: "Safety and permissions",
+    safety: "Safety and Permissions",
   }[view];
 }
 
@@ -83,4 +83,17 @@ export function viewDescription(view: View) {
 
 export function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+export function readinessGuidance(name: string) {
+  return (
+    {
+      repository: "Confirm the folder path is correct and that this account can read and write it, then select Check project setup again.",
+      git: "Install Git and make sure it is on your PATH, then select Check project setup again.",
+      node: "Install Node.js 22 or later and make sure it is on your PATH, then select Check project setup again.",
+      pnpm: "Install pnpm — for example, run \"npm install -g pnpm\" in a terminal — and make sure it is on your PATH, then select Check project setup again.",
+      worktree: "Confirm this folder is a Git repository that supports worktrees, then select Check project setup again.",
+      browser: "Install Google Chrome or Microsoft Edge to enable isolated localhost browser testing.",
+    }[name] ?? "Resolve this outside AwenesOS, then select Check project setup again."
+  );
 }

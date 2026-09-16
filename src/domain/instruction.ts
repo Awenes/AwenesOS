@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const SkillSourceSchema = z.enum(["built_in", "repository", "personal"]);
 export const SkillPermissionSchema = z.enum(["read_repository", "write_worktree", "run_commands", "localhost", "public_network", "browser", "git_commit", "git_push"]);
+export type SkillPermission = z.infer<typeof SkillPermissionSchema>;
 export const SkillSnapshotInputSchema = z.object({
   projectId: z.string().uuid().nullable().default(null), source: SkillSourceSchema,
   slug: z.string().trim().min(1).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),

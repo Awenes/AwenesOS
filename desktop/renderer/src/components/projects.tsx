@@ -150,7 +150,7 @@ export function Projects({
         ))}
         {!data.projects.length && (
           <Empty
-            title="Your projects will appear here"
+            title="Your Projects Will Appear Here"
             copy="Register a local Git repository. Awenes only records it; no agent will run automatically."
           />
         )}

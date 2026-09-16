@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import type { DesktopSnapshot } from "../../../contracts";
-import { splitCommaSeparated } from "../utils/presentation";
+import type { SkillPermission } from "../../../../src/domain/instruction";
+import { SKILL_PERMISSIONS } from "../../../../src/domain/skill-permission";
+import { MultiSelect } from "./multi-select";
 
 export function SkillStudio({
   data,
@@ -10,6 +12,15 @@ export function SkillStudio({
   refresh: () => Promise<void>;
 }) {
   const [show, setShow] = useState(false);
+  const [permissions, setPermissions] = useState<SkillPermission[]>([]);
+  function open() {
+    setPermissions([]);
+    setShow(true);
+  }
+  function cancel() {
+    setPermissions([]);
+    setShow(false);
+  }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -20,15 +31,16 @@ export function SkillStudio({
       name: String(form.get("name")),
       version: String(form.get("version")),
       content: String(form.get("content")),
-      permissions: splitCommaSeparated(String(form.get("permissions"))) as any,
+      permissions,
       reviewed: Boolean(form.get("reviewed")),
     });
+    setPermissions([]);
     setShow(false);
     await refresh();
   }
   return (
     <>
-      <button className="ghost" onClick={() => setShow(!show)}>
+      <button className="ghost" onClick={() => (show ? cancel() : open())}>
         + Local skill
       </button>
       {show && (
@@ -74,16 +86,24 @@ export function SkillStudio({
           </label>
           <label>
             Permissions
-            <input
-              name="permissions"
-              placeholder="read_repository, write_worktree"
+            <MultiSelect
+              label="Skill permissions"
+              options={SKILL_PERMISSIONS}
+              selected={permissions}
+              onChange={(next) => setPermissions(next as SkillPermission[])}
+              placeholder="No permissions selected"
             />
           </label>
           <label className="check">
             <input type="checkbox" name="reviewed" required />I reviewed this
             exact content and its permissions
           </label>
-          <button className="primary">Snapshot skill</button>
+          <div className="form-actions">
+            <button type="button" className="ghost" onClick={cancel}>
+              Cancel
+            </button>
+            <button className="primary">Snapshot skill</button>
+          </div>
         </form>
       )}
     </>

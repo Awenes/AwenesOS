@@ -91,7 +91,7 @@ export function BrowserTestSetup({ projectId }: { projectId: string }) {
     }
   }
 
-  return <Panel title="Localhost browser test">
+  return <Panel title="Localhost Browser Test">
     <p>Find a starting point from your project, then review it before saving. Nothing starts during detection.</p>
     <button type="button" className="ghost" onClick={() => void detect()} disabled={loading || saving}>{loading ? "Checking project setup…" : "Suggest setup from project"}</button>
     {suggestion?.warnings.map((warning) => <p className="setup-warning" key={warning}>{warning}</p>)}

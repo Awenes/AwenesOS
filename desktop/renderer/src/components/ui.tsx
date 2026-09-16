@@ -1,5 +1,6 @@
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { pretty } from "../utils/presentation.js";
+import { StatusIcon } from "./status-icon.js";
 
 export function Pagination({ page, setPage, pageSize, total, totalPages, label }: {
   page: number;
@@ -48,7 +49,7 @@ export function Badge({ text }: { text: string }) {
 }
 
 export function Empty({ title, copy }: { title: string; copy: string }) {
-  return <div className="empty"><span>◇</span><strong>{title}</strong><p>{copy}</p></div>;
+  return <div className="empty"><StatusIcon state="empty" /><strong>{title}</strong><p>{copy}</p></div>;
 }
 
 export function Guard({ title, copy }: { title: string; copy: string }) {

@@ -21,7 +21,7 @@ export function TaskReview({
 }) {
   return (
     <div id="task-review">
-      <Panel title={`Task details · ${details.task.title}`}>
+      <Panel title={`Task Details · ${details.task.title}`}>
         {details.workflow?.run.status === "completed" &&
           details.task.status !== "completed" && (
             <div className="completion-review">
@@ -119,7 +119,7 @@ export function TaskReview({
         ))}
         {details.workflow?.run.status === "completed" && (
           <div className="completion-evidence">
-            <h3>Agent evidence</h3>
+            <h3>Agent Evidence</h3>
             {details.workflow.steps
               .filter((step: any) => step.output)
               .map((step: any) => (
@@ -148,7 +148,7 @@ export function TaskReview({
         {details.workflow?.run.status === "completed" &&
           ["in_progress", "paused", "ready_to_complete"].includes(details.task.status) && (
             <div className="completion-review">
-              <h3>Completion summary</h3>
+              <h3>Completion Summary</h3>
               <p>Review and edit this draft. Saving it does not mark the task complete.</p>
               <label>
                 What was completed and verified?

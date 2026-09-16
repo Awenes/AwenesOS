@@ -14,7 +14,7 @@ export function Notifications({
   const notificationPage = usePagination(data.notifications);
   return (
     <section className="stack">
-      <Panel title="Notification centre">
+      <Panel title="Notification Centre">
         {data.notifications.length ? (
           notificationPage.items.map((item) => (
             <div className="approval-card" key={item.key}>
@@ -56,7 +56,7 @@ export function Notifications({
           ))
         ) : (
           <Empty
-            title="You're caught up"
+            title="You're Caught Up"
             copy="Only actionable local reminders appear here."
           />
         )}

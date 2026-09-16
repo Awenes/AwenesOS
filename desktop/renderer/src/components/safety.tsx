@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import type { DesktopSnapshot } from "../../../contracts";
 import type { ExecutionPolicy, ReadinessReport } from "../../../../src/domain/project";
 import { BrowserTestSetup } from "./browser-test-setup";
-import { Badge, Empty, Panel } from "./ui";
-import { pretty, splitCommaSeparated } from "../utils/presentation";
+import { Empty, Panel } from "./ui";
+import { StatusIcon } from "./status-icon";
+import { pretty, readinessGuidance, splitCommaSeparated } from "../utils/presentation";
 
 export function Safety({ data }: { data: DesktopSnapshot }) {
   const [selected, setSelected] = useState(data.projects[0]?.id ?? "");
@@ -48,14 +49,14 @@ export function Safety({ data }: { data: DesktopSnapshot }) {
       </div>
       {!selected ? (
         <Empty
-          title="Select a project"
+          title="Select a Project"
           copy="Review its effective permissions and environment readiness."
         />
       ) : (
         policy && (
           <>
             <div className="grid-two">
-              <Panel title="Execution permissions">
+              <Panel title="Execution Permissions">
                 <label className="check">
                   <input
                     type="checkbox"
@@ -142,23 +143,41 @@ export function Safety({ data }: { data: DesktopSnapshot }) {
                   />
                   Require developer approval before Git push
                 </label>
-                <button className="primary" onClick={() => void save()}>
-                  {saved ? "Saved" : "Save policy"}
+                <button className="primary save-policy" onClick={() => void save()}>
+                  {saved ? "Saved" : "Save Policy"}
                 </button>
               </Panel>
-              <Panel title="Project setup">
+              <Panel title="Project Setup">
                 {readiness ? (
                   <>
                     <p>{readiness.ready ? "This project is ready for agent runs." : "This project needs attention before agent runs can start."}</p>
-                    {readiness.checks.map((check) => <div className="row" key={check.name}>
-                      <div><strong>{pretty(check.name)}</strong><small>{check.ready ? "Ready" : check.required ? "Action needed" : "Optional"}</small></div>
-                      <Badge text={check.ready ? "Ready" : "Check"} />
-                      {!check.ready && <details><summary>What to check</summary><p>{check.detail}</p></details>}
-                    </div>)}
+                    {readiness.checks.map((check) => {
+                      const state = check.ready ? "ready" : check.required ? "attention" : "optional";
+                      return (
+                        <div className="readiness-row" data-state={state} key={check.name}>
+                          <div className="readiness-row-head">
+                            <StatusIcon state={state} />
+                            <div>
+                              <strong>{pretty(check.name)}</strong>
+                              <small>{check.ready ? "Ready" : check.required ? "Action needed" : "Optional"}</small>
+                            </div>
+                          </div>
+                          {!check.ready && (
+                            <div className="readiness-row-detail">
+                              <p>{readinessGuidance(check.name)}</p>
+                              <details>
+                                <summary>Technical details</summary>
+                                <p>{check.detail}</p>
+                              </details>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </>
                 ) : (
                   <Empty
-                    title="Not checked yet"
+                    title="Not Checked Yet"
                     copy="Run the read-only check to verify Git, Node, pnpm, repository access, and worktree support."
                   />
                 )}

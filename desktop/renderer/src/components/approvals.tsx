@@ -13,7 +13,7 @@ export function Approvals({
   const approvalPage = usePagination(data.approvals);
   return (
     <section className="stack">
-      <Panel title="Approval inbox">
+      <Panel title="Approval Inbox">
         {data.approvals.length ? (
           approvalPage.items.map((item) => (
             <div className="approval-card" key={item.id}>
@@ -62,7 +62,7 @@ export function Approvals({
           ))
         ) : (
           <Empty
-            title="Nothing needs approval"
+            title="Nothing Needs Approval"
             copy="Awenes pauses before sensitive delivery actions."
           />
         )}

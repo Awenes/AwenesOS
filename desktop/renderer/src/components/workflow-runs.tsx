@@ -126,7 +126,7 @@ export function Runs({
   return (
     <section className="stack">
       <div className="grid-two">
-        <Panel title="Workflow runs">
+        <Panel title="Workflow Runs">
           <div className="segmented">
             <button className={scope === "active" ? "active" : ""} onClick={() => { setScope("active"); setSelected(null); setDetails(null); }}>Active</button>
             <button className={scope === "archived" ? "active" : ""} onClick={() => { setScope("archived"); setSelected(null); setDetails(null); }}>Archived</button>
@@ -160,16 +160,16 @@ export function Runs({
             ))
           ) : (
             <Empty
-              title="No workflow runs"
+              title="No Workflow Runs"
               copy="Open a task and create a run after configuring its roles and provider."
             />
           )}
           <Pagination {...runPage} label="runs" />
         </Panel>
-        <Panel title="Run inspector">
+        <Panel title="Run Inspector">
           {!details ? (
             <Empty
-              title="Select a run"
+              title="Select a Run"
               copy="Inspect snapshotted instructions, attempts, approvals, evidence, and delivery."
             />
           ) : (

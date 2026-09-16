@@ -1,5 +1,6 @@
 import type { DesktopSnapshot } from "../../../contracts";
-import { Badge, Empty, Guard, Metric, Panel } from "./ui";
+import { Badge, Empty, Guard, Metric, Pagination, Panel } from "./ui";
+import { usePagination } from "../hooks/use-pagination";
 import { pretty, projectName, type View } from "../utils/presentation";
 
 export function Overview({
@@ -11,6 +12,8 @@ export function Overview({
   active: DesktopSnapshot["tasks"];
   navigate: (view: View) => void;
 }) {
+  const activePage = usePagination(active, undefined, 5);
+  const projectPage = usePagination(data.projects, undefined, 5);
   return (
     <section className="stack">
       <Onboarding data={data} navigate={navigate} />
@@ -23,14 +26,14 @@ export function Overview({
           onClick={() => navigate("projects")}
         />
         <Metric
-          label="Active work"
+          label="Active Work"
           value={active.length}
           note="Across all projects"
           tone="violet"
           onClick={() => navigate("tasks")}
         />
         <Metric
-          label="Agent runs"
+          label="Agent Runs"
           value={data.runs.length}
           note="Workflow history"
           tone="amber"
@@ -46,64 +49,70 @@ export function Overview({
       </div>
       <div className="grid-two">
         <Panel
-          title="Current work"
+          title="Current Work"
           action="Open tasks"
           onAction={() => navigate("tasks")}
         >
           {active.length ? (
-            active.slice(0, 5).map((task) => (
-              <div className="row" key={task.id}>
-                <div>
-                  <strong>{task.title}</strong>
-                  <small>{projectName(data, task.projectId)}</small>
+            <>
+              {activePage.items.map((task) => (
+                <div className="row" key={task.id}>
+                  <div>
+                    <strong>{task.title}</strong>
+                    <small>{projectName(data, task.projectId)}</small>
+                  </div>
+                  <Badge text={pretty(task.status)} />
                 </div>
-                <Badge text={pretty(task.status)} />
-              </div>
-            ))
+              ))}
+              <Pagination {...activePage} label="tasks" />
+            </>
           ) : (
             <Empty
-              title="No active work"
+              title="No Active Work"
               copy="Claim a captured task when you're ready to begin."
             />
           )}
         </Panel>
         <Panel
-          title="Project health"
+          title="Project Health"
           action="Review safety"
           onAction={() => navigate("safety")}
         >
           {data.projects.length ? (
-            data.projects.map((project) => (
-              <div className="row" key={project.id}>
-                <div>
-                  <strong>{project.name}</strong>
-                  <small>
-                    {project.defaultBranch} · {pretty(project.completionPolicy)}
-                  </small>
+            <>
+              {projectPage.items.map((project) => (
+                <div className="row" key={project.id}>
+                  <div>
+                    <strong>{project.name}</strong>
+                    <small>
+                      {project.defaultBranch} · {pretty(project.completionPolicy)}
+                    </small>
+                  </div>
+                  <span className="healthy">Ready to inspect</span>
                 </div>
-                <span className="healthy">Ready to inspect</span>
-              </div>
-            ))
+              ))}
+              <Pagination {...projectPage} label="projects" />
+            </>
           ) : (
             <Empty
-              title="No projects registered"
+              title="No Projects Registered"
               copy="Add your first local repository to begin."
             />
           )}
         </Panel>
       </div>
-      <Panel title="How Awenes protects your work">
+      <Panel title="How Awenes Protects Your Work">
         <div className="guardrails">
           <Guard
-            title="Dedicated worktrees"
+            title="Dedicated Worktrees"
             copy="Agents never write in your normal checkout."
           />
           <Guard
-            title="Approval-aware delivery"
+            title="Approval-Aware Delivery"
             copy="Push behavior follows each project's policy."
           />
           <Guard
-            title="Evidence before completion"
+            title="Evidence Before Completion"
             copy="Tasks close only after evidence and your chosen delivery gate."
           />
         </div>
@@ -145,7 +154,7 @@ function Onboarding({
   ];
   if (checks.every((item) => item.done)) return null;
   return (
-    <Panel title="Finish setup">
+    <Panel title="Finish Setup">
       <div className="onboarding">
         {checks.map((item) => (
           <button

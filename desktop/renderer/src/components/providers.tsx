@@ -202,7 +202,7 @@ export function Providers({
         ))}
         {!data.providers.length && (
           <Empty
-            title="No model provider connected"
+            title="No Model Provider Connected"
             copy="API keys are encrypted locally. CLI mode uses the provider tool's own supported login."
           />
         )}

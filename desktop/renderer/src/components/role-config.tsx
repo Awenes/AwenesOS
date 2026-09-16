@@ -30,7 +30,7 @@ export function RoleConfig({
   }
   return (
     <div className="model">
-      <span>Provider and model</span>
+      <span>Provider and Model</span>
       <select
         value={provider}
         onChange={(event) => {

@@ -180,7 +180,7 @@ export function Tasks({
           </div>
         </form>
       )}
-      <Panel title={`${filtered.length} tasks`}>
+      <Panel title={`${filtered.length} Tasks`}>
         {filtered.length ? (
           taskPage.items.map((task) => (
             <div className="task-row" key={task.id}>
@@ -338,7 +338,7 @@ export function Tasks({
           ))
         ) : (
           <Empty
-            title="No matching tasks"
+            title="No Matching Tasks"
             copy="Capture work here or from the CLI."
           />
         )}
