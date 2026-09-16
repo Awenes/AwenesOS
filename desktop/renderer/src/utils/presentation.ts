@@ -81,20 +81,6 @@ export function viewDescription(view: View) {
   }[view];
 }
 
-export function viewIcon(view: View) {
-  return {
-    overview: "⌂",
-    projects: "▦",
-    tasks: "✓",
-    runs: "▶",
-    approvals: "!",
-    agents: "◎",
-    providers: "◉",
-    notifications: "◌",
-    safety: "◈",
-  }[view];
-}
-
 export function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }

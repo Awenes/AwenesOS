@@ -24,4 +24,4 @@ The Electron v0.1 desktop application is the primary AwenesOS interface. It stor
 - Push authorization is checked against durable approval history in the trusted main process.
 - Windows process/network isolation is policy enforcement at the Awenes tool boundary, not an OS sandbox guarantee.
 
-The CLI remains supported for diagnostics, tracker imports, and scripted local operation.
+The CLI remains supported for diagnostics and scripted local operation.

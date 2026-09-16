@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { TaskService } from "../src/application/task-service.js";
-import { ManualCrmAdapter } from "../src/infrastructure/crm/manual-crm-adapter.js";
 import { openDatabase } from "../src/infrastructure/db/database.js";
 import { TaskRepository } from "../src/infrastructure/repositories/task-repository.js";
 
@@ -8,11 +7,7 @@ describe("local task completion", () => {
   it("completes without creating a CRM or tracker update", async () => {
     const opened = await openDatabase(":memory:");
     const repository = new TaskRepository(opened.db);
-    const service = new TaskService(
-      repository,
-      new ManualCrmAdapter(),
-      "local",
-    );
+    const service = new TaskService(repository);
     const task = await service.capture({
       title: "Local delivery",
       source: "manual",
@@ -31,8 +26,6 @@ describe("local task completion", () => {
       status: "completed",
       completionDescription: "Reviewed implementation and tests",
     });
-    expect(await service.pendingManualCrmUpdates()).toHaveLength(0);
-    expect(await service.pendingTrackerUpdates()).toHaveLength(0);
     expect((await service.history(task.id)).at(-1)?.type).toBe(
       "task.completed",
     );

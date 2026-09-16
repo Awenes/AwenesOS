@@ -9,25 +9,19 @@ Run `pnpm cli` with no command for the guided daily workflow. It provides number
 | `guided` | Open the interactive daily workflow |
 | `capture` | Add work from any supported source |
 | `inbox` | List candidates and explicit assignments |
-| `tracker-import <file> --config <file>` | Import CSV tracker rows as unassigned inbox candidates |
-| `tracker-updates` | List completed tasks awaiting a manual SharePoint tracker update |
-| `tracker-confirm <taskId>` | Confirm that the live SharePoint tracker was manually updated |
 | `confirm`, `claim`, `reject` | Triage inbox work |
-| `crm-map` | Record an existing CRM task reference |
-| `crm-updates` | List CRM status/description changes awaiting manual action |
-| `crm-confirm <taskId>` | Confirm that the current CRM instruction was manually applied |
 | `duration <taskId>` | Show active, paused, and calendar duration |
-| `task-summary <taskId>` | Show task, timing, evidence, repository, and external-update details |
-| `queue` | List executable and pending-sync work |
-| `start`, `pause`, `resume` | Update execution state locally and externally |
+| `task-summary <taskId>` | Show task, timing, evidence, and repository details |
+| `queue` | List planned and active work |
+| `start`, `pause`, `resume` | Update execution state locally |
 | `evidence` | Attach completion evidence |
 | `git-evidence <id> [repository]` | Collect commit and changed-file metadata since the task started |
 | `repo-attach <id> [repository]` | Validate and attach a local Git repository to planned or active work |
 | `repo-show <id>` | Show a task's saved repository mapping |
 | `prepare-completion` | Build or accept a completion description |
 | `draft-completion <id>` | Preview a structured evidence-based draft without changing task state |
-| `edit-completion` | Revise the description before sync |
-| `complete` | Sync completion, or retry pending sync |
+| `edit-completion` | Revise the description before finishing |
+| `complete` | Mark a reviewed task complete locally |
 | `history` | Show the task event trail |
 | `standup [date] [-o file]` | Generate a Markdown standup for `today`, `yesterday`, or `YYYY-MM-DD` |
 | `weekly-review [ending] [-o file]` | Generate a five-working-day Markdown review |

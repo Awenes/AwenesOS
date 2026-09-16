@@ -9,7 +9,7 @@ import type {
   ProviderKind,
   ProviderStatus,
 } from "../src/domain/provider.js";
-import type { BrowserTestConfig } from "../src/domain/browser-test.js";
+import type { BrowserTestConfig, BrowserSetupSuggestion } from "../src/domain/browser-test.js";
 import type { SkillSnapshotInput } from "../src/domain/instruction.js";
 import type { NotificationKind } from "../src/domain/notification.js";
 
@@ -107,6 +107,7 @@ export interface DesktopApi {
     listener: (feedback: {
       message: string;
       tone: "success" | "error";
+      details?: string;
     }) => void,
   ): () => void;
   snapshot(): Promise<DesktopSnapshot>;
@@ -185,7 +186,8 @@ export interface DesktopApi {
   gitReview(runId: string): Promise<unknown>;
   gitCommit(input: { runId: string; message: string }): Promise<void>;
   gitPush(runId: string): Promise<void>;
-  saveBrowserConfig(input: BrowserTestConfig): Promise<void>;
+  saveBrowserConfig(input: { config: BrowserTestConfig; confirmLocalhostAccess: true }): Promise<void>;
+  suggestBrowserConfig(projectId: string): Promise<BrowserSetupSuggestion>;
   saveBrowserCredential(input: {
     projectId: string;
     key: string;

@@ -1,27 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { NotificationService } from "../src/application/notification-service.js";
 import { TaskService } from "../src/application/task-service.js";
-import type { CrmTaskAdapter } from "../src/domain/crm.js";
 import { openDatabase } from "../src/infrastructure/db/database.js";
 import { TaskRepository } from "../src/infrastructure/repositories/task-repository.js";
 import { ProjectRepository } from "../src/infrastructure/repositories/project-repository.js";
 import { WorkflowRepository } from "../src/infrastructure/repositories/workflow-repository.js";
 
 describe("notification centre", () => {
-  it("does not surface legacy CRM synchronization failures", async () => {
+  it("does not surface external-update reminders for completed local tasks", async () => {
     const opened = await openDatabase(":memory:");
     const repository = new TaskRepository(opened.db);
-    const crm: CrmTaskAdapter = {
-      name: "failing",
-      async createTask() {
-        return { externalTaskId: "x" };
-      },
-      async updateExecutionStatus() {},
-      async completeTask() {
-        throw new Error("CRM offline");
-      },
-    };
-    const tasks = new TaskService(repository, crm);
+    const tasks = new TaskService(repository);
     const centre = new NotificationService(repository);
     const task = await tasks.capture({
       title: "Notify failed sync",
@@ -31,10 +20,9 @@ describe("notification centre", () => {
       occurredAt: new Date("2026-09-03T08:00:00Z"),
     });
     await tasks.claim(task.id);
-    await tasks.mapToCrm(task.id, "p");
     await tasks.start(task.id);
     await tasks.prepareCompletion(task.id, "Done");
-    await expect(tasks.complete(task.id)).rejects.toThrow("sync_pending");
+    await tasks.complete(task.id);
     const now = new Date("2026-09-03T10:00:00Z");
     expect(await centre.list(now)).toHaveLength(0);
     opened.client.close();

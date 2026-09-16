@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const temporaryRoot = await mkdtemp(join(tmpdir(), "awenes-desktop-smoke-"));
 const screenshotPath = join(temporaryRoot, "launch.png");
@@ -23,7 +23,7 @@ function launch(executable, screenshot, database) {
   return new Promise((resolveExit, reject) => {
     const desktopEnvironment = { ...process.env, AWENES_DB_PATH: database };
     delete desktopEnvironment.ELECTRON_RUN_AS_NODE;
-    const child = spawn(executable, [".", `capture=${screenshot}`], {
+    const child = spawn(executable, [`--user-data-dir=${join(dirname(screenshot), "electron-profile")}`, "--disable-gpu", ".", `capture=${screenshot}`], {
       cwd: process.cwd(),
       env: desktopEnvironment,
       stdio: "inherit",

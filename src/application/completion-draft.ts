@@ -17,7 +17,7 @@ export function draftCompletionDescription(task: Task, evidence: CompletionEvide
   if (links.length || task.sourceReference) sections.push(section("References", [...links, ...(task.sourceReference ? [task.sourceReference] : [])]));
   if (repository) sections.push(section("Repository context", [`${repository.repositoryRoot} (${repository.branchAtMapping})`]));
   if (task.assignmentDescription.trim()) sections.push(section("Requested outcome", [task.assignmentDescription.trim()]));
-  if (!evidence.length) sections.push(section("Review required", ["No completion evidence is recorded yet. Replace or expand this draft before synchronization."]));
+  if (!evidence.length) sections.push(section("Review required", ["No completion evidence is recorded yet. Replace or expand this draft before finishing the task."]));
   return sections.join("\n\n");
 }
 

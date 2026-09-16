@@ -87,8 +87,7 @@ API calls can incur provider charges. Use a low-cost test model and a small task
 ### Optional integration fixtures
 
 - a disposable remote repository for push testing;
-- a small localhost web application with a health endpoint;
-- a sample tracker CSV for legacy CLI import coverage.
+- a small localhost web application with a health endpoint.
 
 ## 5. Acceptance build
 
@@ -433,11 +432,10 @@ Expected:
 
 Steps:
 
-1. Set the project network policy to **Localhost only** and save it.
-2. In Safety, enter an explicit localhost base URL and same-origin health URL.
-3. Enter the start command/arguments and installed Chrome or Edge executable.
-4. Optionally enter disposable test credential name/value.
-5. Save the browser configuration.
+1. In Safety, select **Suggest setup from project**. Confirm that detection does not execute a command or save permissions.
+2. Review or edit the suggested dev command, base URL, same-origin health URL, and Chrome or Edge executable. For a non-Node project, enter these manually.
+3. Optionally enter disposable test credential name/value.
+4. Confirm the displayed command and localhost access, then save the browser setup.
 
 Expected:
 
@@ -445,6 +443,7 @@ Expected:
 - Base and health URLs must have the same origin.
 - Credentials are not redisplayed in plaintext.
 - Public-network permission is not required for this localhost-only test.
+- A save cannot occur until the command and localhost permission are confirmed.
 
 The v0.1 graphical form configures an HTTP-200 smoke assertion. The underlying engine also supports fill, click, keypress, wait, visible-text/URL/status assertions, and optional setup/cleanup commands; those advanced definitions are covered by automated tests but are not individually editable in the current desktop form.
 

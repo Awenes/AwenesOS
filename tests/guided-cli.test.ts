@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TaskService } from "../src/application/task-service.js";
 import { GuidedCli, type GuidedIO } from "../src/cli/guided-cli.js";
-import { MockCrmAdapter } from "../src/infrastructure/crm/mock-crm-adapter.js";
 import { openDatabase } from "../src/infrastructure/db/database.js";
 import { TaskRepository } from "../src/infrastructure/repositories/task-repository.js";
 
@@ -25,8 +24,8 @@ describe("guided CLI", () => {
   it("captures a task without exposing task IDs", async () => {
     const dir = await mkdtemp(join(tmpdir(), "awenes-guided-")); dirs.push(dir);
     const opened = await openDatabase(":memory:");
-    const service = new TaskService(new TaskRepository(opened.db), new MockCrmAdapter(join(dir, "crm.json")));
-    const io = new ScriptedIO(["1", "Fix enrollment validation", "5", "Handle invalid student records", "", "yes", "9"]);
+    const service = new TaskService(new TaskRepository(opened.db));
+    const io = new ScriptedIO(["1", "Fix enrollment validation", "5", "Handle invalid student records", "", "yes", "7"]);
     await new GuidedCli(service, io).run();
     const inbox = await service.inbox();
     expect(inbox).toHaveLength(1);

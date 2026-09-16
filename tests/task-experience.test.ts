@@ -5,7 +5,7 @@ const task = { status: "in_progress" as const, archivedAt: null, deletedAt: null
 describe("task experience state", () => {
   it("only reports working when a workflow step is actually executing", () => {
     expect(deriveTaskExperience({ task, run: { status: "running", currentStage: "plan" }, stepStatus: "pending" }).label).toBe("Preparing");
-    expect(deriveTaskExperience({ task, run: { status: "running", currentStage: "plan" }, stepStatus: "running" }).label).toBe("Working: Plan");
+    expect(deriveTaskExperience({ task, run: { status: "running", currentStage: "plan" }, stepStatus: "running" }).label).toBe("Creating a plan");
   });
   it("prioritizes interventions and external confirmation", () => {
     expect(deriveTaskExperience({ task, run: { status: "running", currentStage: "implement" }, hasOpenIntervention: true }).state).toBe("needs_input");

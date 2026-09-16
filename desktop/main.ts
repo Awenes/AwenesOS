@@ -13,6 +13,7 @@ import { z } from "zod";
 import type { DesktopSnapshot } from "./contracts.js";
 import { AgentRoleService } from "../src/application/agent-role-service.js";
 import { BrowserTestService } from "../src/application/browser-test-service.js";
+import { detectLocalBrowserSetup } from "../src/infrastructure/browser/local-browser-setup-detector.js";
 import { GitDeliveryService } from "../src/application/git-delivery-service.js";
 import { InstructionService } from "../src/application/instruction-service.js";
 import { NotificationService } from "../src/application/notification-service.js";
@@ -32,7 +33,6 @@ import {
 import { ProviderConnectionInputSchema } from "../src/domain/provider.js";
 import { TaskSourceSchema } from "../src/domain/task.js";
 import { PlaywrightBrowserAutomation } from "../src/infrastructure/browser/playwright-browser-automation.js";
-import { ManualCrmAdapter } from "../src/infrastructure/crm/manual-crm-adapter.js";
 import { openDatabase } from "../src/infrastructure/db/database.js";
 import { LocalEnvironmentInspector } from "../src/infrastructure/environment/local-environment-inspector.js";
 import { GuardedCommandExecutor } from "../src/infrastructure/execution/guarded-command-executor.js";
@@ -101,7 +101,7 @@ async function start() {
     vault = new EncryptedSecretVault(
       join(app.getPath("userData"), "secrets.json"),
     );
-  const taskService = new TaskService(tasks, new ManualCrmAdapter(), "local"),
+  const taskService = new TaskService(tasks),
     projectService = new ProjectService(
       projects,
       new LocalEnvironmentInspector(),
@@ -679,8 +679,12 @@ function registerIpc(window: BrowserWindow, s: Services) {
   handle("awenes:git:push", async (input) => {
     await s.gitService.push(z.string().uuid().parse(input));
   });
+  handle("awenes:browser:suggest", async (input) => {
+    const project = await s.projects.get(z.string().uuid().parse(input));
+    return detectLocalBrowserSetup(project.repositoryRoot);
+  });
   handle("awenes:browser:config", async (input) => {
-    const config = BrowserTestConfigSchema.parse(input);
+    const { config } = z.object({ config: BrowserTestConfigSchema, confirmLocalhostAccess: z.literal(true) }).parse(input);
     await s.browserService.saveConfig(config);
     const policy = await s.projects.executionPolicy(config.projectId);
     const browserCommands = [

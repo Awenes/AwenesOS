@@ -10,7 +10,6 @@ import {
   lt,
 } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import type { CrmTaskMapping } from "../../domain/crm.js";
 import type {
   CaptureTask,
   EvidenceKind,
@@ -20,27 +19,13 @@ import type {
 import type { NotificationPreference } from "../../domain/notification.js";
 import type { Database } from "../db/database.js";
 import {
-  crmMappings,
   evidence,
-  manualCrmUpdates,
   notificationPreferences,
   taskEvents,
   taskRepositories,
   tasks,
   taskTombstones,
-  trackerUpdates,
 } from "../db/schema.js";
-
-export interface ManualTrackerUpdate {
-  id: string;
-  taskId: string;
-  reference: string;
-  suggestedStatus: string;
-  suggestedComment: string;
-  status: "pending" | "confirmed";
-  createdAt: Date;
-  confirmedAt: Date | null;
-}
 
 export interface TaskRepositoryMapping {
   taskId: string;
@@ -49,16 +34,6 @@ export interface TaskRepositoryMapping {
   headAtMapping: string;
   createdAt: Date;
   updatedAt: Date;
-}
-export interface ManualCrmUpdate {
-  id: string;
-  taskId: string;
-  desiredStatus: string;
-  description: string | null;
-  status: "pending" | "confirmed" | "superseded";
-  createdAt: Date;
-  confirmedAt: Date | null;
-  supersededAt: Date | null;
 }
 
 export class TaskRepository {
@@ -243,7 +218,7 @@ export class TaskRepository {
   async markCompleted(
     id: string,
     now = new Date(),
-    eventType = "task.crm_sync_succeeded",
+    eventType = "task.completed",
   ): Promise<Task> {
     await this.db
       .update(tasks)
@@ -256,18 +231,6 @@ export class TaskRepository {
       .where(eq(tasks.id, id));
     await this.event(id, eventType, {}, now);
     return this.get(id);
-  }
-
-  async markSyncFailure(id: string, message: string): Promise<void> {
-    await this.db
-      .update(tasks)
-      .set({
-        status: "sync_pending",
-        syncError: message,
-        updatedAt: new Date(),
-      })
-      .where(eq(tasks.id, id));
-    await this.event(id, "task.crm_sync_failed", { message });
   }
 
   async addEvidence(
@@ -309,112 +272,6 @@ export class TaskRepository {
       .from(taskEvents)
       .where(eq(taskEvents.taskId, taskId))
       .orderBy(asc(taskEvents.occurredAt));
-  }
-
-  async saveMapping(mapping: CrmTaskMapping): Promise<void> {
-    await this.db
-      .insert(crmMappings)
-      .values({ id: randomUUID(), ...mapping, createdAt: new Date() })
-      .onConflictDoUpdate({
-        target: [crmMappings.taskId, crmMappings.adapter],
-        set: {
-          projectId: mapping.projectId,
-          externalTaskId: mapping.externalTaskId,
-          externalUrl: mapping.externalUrl,
-        },
-      });
-    await this.event(mapping.taskId, "task.crm_mapped", { ...mapping });
-  }
-
-  async mapping(
-    taskId: string,
-    adapter: string,
-  ): Promise<CrmTaskMapping | null> {
-    const row = await this.db.query.crmMappings.findFirst({
-      where: and(
-        eq(crmMappings.taskId, taskId),
-        eq(crmMappings.adapter, adapter),
-      ),
-    });
-    return row
-      ? {
-          taskId: row.taskId,
-          adapter: row.adapter,
-          projectId: row.projectId,
-          externalTaskId: row.externalTaskId,
-          externalUrl: row.externalUrl,
-        }
-      : null;
-  }
-
-  async queueTrackerUpdate(task: Task): Promise<ManualTrackerUpdate> {
-    if (task.source !== "bug-tracker")
-      throw new Error("Only bug-tracker tasks require a manual tracker update");
-    if (!task.completionDescription)
-      throw new Error(
-        "A completion description is required for the tracker update",
-      );
-    const now = new Date();
-    const update: ManualTrackerUpdate = {
-      id: randomUUID(),
-      taskId: task.id,
-      reference: task.sourceReference ?? task.title,
-      suggestedStatus: "Completed",
-      suggestedComment: task.completionDescription,
-      status: "pending",
-      createdAt: now,
-      confirmedAt: null,
-    };
-    await this.db
-      .insert(trackerUpdates)
-      .values(update)
-      .onConflictDoUpdate({
-        target: trackerUpdates.taskId,
-        set: {
-          reference: update.reference,
-          suggestedStatus: update.suggestedStatus,
-          suggestedComment: update.suggestedComment,
-          status: "pending",
-          createdAt: now,
-          confirmedAt: null,
-        },
-      });
-    await this.event(
-      task.id,
-      "task.tracker_manual_update_requested",
-      { reference: update.reference, suggestedStatus: update.suggestedStatus },
-      now,
-    );
-    const stored = await this.db.query.trackerUpdates.findFirst({
-      where: eq(trackerUpdates.taskId, task.id),
-    });
-    return stored as ManualTrackerUpdate;
-  }
-
-  async pendingTrackerUpdates(): Promise<ManualTrackerUpdate[]> {
-    return (await this.db
-      .select()
-      .from(trackerUpdates)
-      .where(eq(trackerUpdates.status, "pending"))
-      .orderBy(asc(trackerUpdates.createdAt))) as ManualTrackerUpdate[];
-  }
-
-  async confirmTrackerUpdate(taskId: string): Promise<ManualTrackerUpdate> {
-    const now = new Date();
-    const changed = await this.db
-      .update(trackerUpdates)
-      .set({ status: "confirmed", confirmedAt: now })
-      .where(
-        and(
-          eq(trackerUpdates.taskId, taskId),
-          eq(trackerUpdates.status, "pending"),
-        ),
-      )
-      .returning();
-    if (!changed[0])
-      throw new Error(`No pending manual tracker update for task ${taskId}`);
-    await this.event(taskId, "task.tracker_manual_update_confirmed", {}, now);
-    return changed[0] as ManualTrackerUpdate;
   }
 
   async saveRepositoryMapping(
@@ -490,82 +347,6 @@ export class TaskRepository {
       preference.updatedAt,
     );
     return preference;
-  }
-
-  async queueManualCrmUpdate(
-    taskId: string,
-    desiredStatus: string,
-    description: string | null = null,
-  ): Promise<ManualCrmUpdate> {
-    await this.get(taskId);
-    const now = new Date();
-    await this.db
-      .update(manualCrmUpdates)
-      .set({ status: "superseded", supersededAt: now })
-      .where(
-        and(
-          eq(manualCrmUpdates.taskId, taskId),
-          eq(manualCrmUpdates.status, "pending"),
-        ),
-      );
-    const update: ManualCrmUpdate = {
-      id: randomUUID(),
-      taskId,
-      desiredStatus,
-      description,
-      status: "pending",
-      createdAt: now,
-      confirmedAt: null,
-      supersededAt: null,
-    };
-    await this.db.insert(manualCrmUpdates).values(update);
-    await this.event(
-      taskId,
-      "task.crm_manual_update_requested",
-      { desiredStatus, description },
-      now,
-    );
-    return update;
-  }
-  async pendingManualCrmUpdates(): Promise<ManualCrmUpdate[]> {
-    return (await this.db
-      .select()
-      .from(manualCrmUpdates)
-      .where(eq(manualCrmUpdates.status, "pending"))
-      .orderBy(asc(manualCrmUpdates.createdAt))) as ManualCrmUpdate[];
-  }
-  async pendingManualCrmUpdate(
-    taskId: string,
-  ): Promise<ManualCrmUpdate | null> {
-    const row = await this.db.query.manualCrmUpdates.findFirst({
-      where: and(
-        eq(manualCrmUpdates.taskId, taskId),
-        eq(manualCrmUpdates.status, "pending"),
-      ),
-    });
-    return row ? (row as ManualCrmUpdate) : null;
-  }
-  async confirmManualCrmUpdate(taskId: string): Promise<ManualCrmUpdate> {
-    const now = new Date();
-    const rows = await this.db
-      .update(manualCrmUpdates)
-      .set({ status: "confirmed", confirmedAt: now })
-      .where(
-        and(
-          eq(manualCrmUpdates.taskId, taskId),
-          eq(manualCrmUpdates.status, "pending"),
-        ),
-      )
-      .returning();
-    if (!rows[0])
-      throw new Error(`No pending manual CRM update for task ${taskId}`);
-    await this.event(
-      taskId,
-      "task.crm_manual_update_confirmed",
-      { desiredStatus: rows[0].desiredStatus },
-      now,
-    );
-    return rows[0] as ManualCrmUpdate;
   }
 
   async changedBetween(from: Date, to: Date): Promise<Task[]> {

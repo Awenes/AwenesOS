@@ -1,5 +1,6 @@
 import type { Task, TaskStatus } from "./task.js";
 import type { ApprovalKind, WorkflowRunStatus, WorkflowStage, WorkflowStepStatus } from "./workflow.js";
+import { workflowStageMessage } from "./workflow-messages.js";
 
 export type TaskExperienceState =
   | "draft" | "preparing" | "working" | "needs_input" | "ready_for_review"
@@ -35,10 +36,9 @@ export function deriveTaskExperience(input: {
     return experience("needs_input", run.currentStage, approvalKind === "plan" ? "Plan ready for approval" : "Needs your input", "warning");
   }
   if (run.status === "running" && stepStatus === "running")
-    return experience("working", run.currentStage, `Working: ${stageLabel(run.currentStage)}`, "info");
+    return experience("working", run.currentStage, workflowStageMessage(run.currentStage, "running"), "info");
   return experience("preparing", run.currentStage, "Preparing", "info");
 }
 
 function experience(state: TaskExperienceState, stage: WorkflowStage | null, label: string, tone: TaskExperience["tone"]): TaskExperience { return { state, stage, label, tone }; }
-function stageLabel(stage: WorkflowStage | null) { return stage ? `${stage[0]?.toUpperCase()}${stage.slice(1)}` : "Task"; }
 function taskLabel(status: TaskStatus) { return status === "paused" ? "Paused" : status === "ready_to_complete" ? "Ready for review" : "Draft"; }

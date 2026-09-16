@@ -1,4 +1,3 @@
-import type { CrmCoordinationMode, CrmTaskAdapter } from "../domain/crm.js";
 import {
   assertTransition,
   CaptureTaskSchema,
@@ -21,11 +20,7 @@ import {
 import type { ProjectRepository } from "../infrastructure/repositories/project-repository.js";
 
 export class TaskService {
-  constructor(
-    private readonly repository: TaskRepository,
-    private readonly crm: CrmTaskAdapter,
-    private readonly crmMode: CrmCoordinationMode = "automatic",
-  ) {}
+  constructor(private readonly repository: TaskRepository) {}
 
   capture(input: CaptureTask) {
     return this.repository.create(CaptureTaskSchema.parse(input));
@@ -93,38 +88,6 @@ export class TaskService {
   }
   async reject(id: string) {
     return this.move(id, "rejected", "task.rejected");
-  }
-
-  async mapToCrm(
-    id: string,
-    projectId: string,
-    externalTaskId?: string,
-    externalUrl?: string,
-  ) {
-    const task = await this.repository.get(id);
-    if (this.crmMode === "manual" && !externalTaskId?.trim())
-      throw new Error(
-        "Manual CRM mode requires an existing CRM task ID or reference",
-      );
-    const external = externalTaskId
-      ? {
-          externalTaskId,
-          ...(externalUrl?.trim() ? { externalUrl: externalUrl.trim() } : {}),
-        }
-      : await this.crm.createTask({
-          projectId,
-          title: task.title,
-          description: task.assignmentDescription,
-        });
-    await this.repository.saveMapping({
-      taskId: id,
-      adapter: this.crm.name,
-      projectId,
-      externalTaskId: external.externalTaskId,
-      externalUrl:
-        "externalUrl" in external ? (external.externalUrl ?? null) : null,
-    });
-    return external;
   }
 
   async start(id: string) {
@@ -247,7 +210,7 @@ export class TaskService {
 
   async editCompletion(id: string, description: string) {
     const task = await this.repository.get(id);
-    if (task.status !== "ready_to_complete" && task.status !== "sync_pending")
+    if (task.status !== "ready_to_complete")
       throw new Error(
         "Completion description can only be edited during completion",
       );
@@ -255,89 +218,12 @@ export class TaskService {
   }
 
   async complete(id: string): Promise<Task> {
-    let task = await this.repository.get(id);
-    if (this.crmMode === "local") {
-      if (task.status !== "ready_to_complete")
-        throw new Error(
-          `Task is not ready to complete; task is ${task.status}`,
-        );
-      if (!task.completionDescription)
-        throw new Error("A completion description is required");
-      return this.repository.markCompleted(id, new Date(), "task.completed");
-    }
-    if (this.crmMode === "manual") {
-      if (task.status === "ready_to_complete")
-        task = await this.repository.transition(
-          id,
-          "ready_to_complete",
-          "sync_pending",
-          "task.crm_manual_completion_pending",
-        );
-      if (task.status !== "sync_pending")
-        throw new Error(
-          `Task is not ready for manual CRM confirmation; task is ${task.status}`,
-        );
-      if (!task.completionDescription)
-        throw new Error("A completion description is required");
-      const pending = await this.repository.pendingManualCrmUpdate(id);
-      if (
-        pending?.desiredStatus !== "Completed" ||
-        pending.description !== task.completionDescription
-      )
-        await this.repository.queueManualCrmUpdate(
-          id,
-          "Completed",
-          task.completionDescription,
-        );
-      return task;
-    }
-    if (task.status === "ready_to_complete")
-      task = await this.repository.transition(
-        id,
-        "ready_to_complete",
-        "sync_pending",
-        "task.crm_sync_started",
-      );
-    if (task.status !== "sync_pending")
-      throw new Error(`Task is not ready for CRM sync; task is ${task.status}`);
+    const task = await this.repository.get(id);
+    if (task.status !== "ready_to_complete")
+      throw new Error(`Task is not ready to complete; task is ${task.status}`);
     if (!task.completionDescription)
       throw new Error("A completion description is required");
-    const mapping = await this.requiredMapping(id);
-    try {
-      await this.crm.completeTask(mapping, {
-        assignmentDescription: task.assignmentDescription,
-        completionDescription: task.completionDescription,
-      });
-      const completed = await this.repository.markCompleted(id);
-      if (completed.source === "bug-tracker")
-        await this.repository.queueTrackerUpdate(completed);
-      return completed;
-    } catch (error) {
-      await this.repository.markSyncFailure(id, errorMessage(error));
-      throw new Error(
-        `CRM sync failed; task remains sync_pending: ${errorMessage(error)}`,
-      );
-    }
-  }
-
-  pendingTrackerUpdates() {
-    return this.repository.pendingTrackerUpdates();
-  }
-  confirmTrackerUpdate(taskId: string) {
-    return this.repository.confirmTrackerUpdate(taskId);
-  }
-  pendingManualCrmUpdates() {
-    return this.repository.pendingManualCrmUpdates();
-  }
-  async confirmManualCrmUpdate(taskId: string) {
-    const update = await this.repository.confirmManualCrmUpdate(taskId);
-    let task = await this.repository.get(taskId);
-    if (update.desiredStatus === "Completed") {
-      task = await this.repository.markCompleted(taskId);
-      if (task.source === "bug-tracker")
-        await this.repository.queueTrackerUpdate(task);
-    }
-    return { update, task };
+    return this.repository.markCompleted(id, new Date(), "task.completed");
   }
   async duration(id: string, now = new Date()) {
     await this.repository.get(id);
@@ -379,36 +265,6 @@ export class TaskService {
   ) {
     const task = await this.repository.get(id);
     assertTransition(task.status, to);
-    if (this.crmMode === "local")
-      return this.repository.transition(id, task.status, to, event);
-    if (this.crmMode === "manual") {
-      const transitioned = await this.repository.transition(
-        id,
-        task.status,
-        to,
-        event,
-      );
-      await this.repository.queueManualCrmUpdate(
-        id,
-        to === "paused" ? "Paused" : "In Progress",
-      );
-      return transitioned;
-    }
-    const mapping = await this.requiredMapping(id);
-    await this.crm.updateExecutionStatus(mapping, to);
     return this.repository.transition(id, task.status, to, event);
   }
-
-  private async requiredMapping(id: string) {
-    const mapping = await this.repository.mapping(id, this.crm.name);
-    if (!mapping)
-      throw new Error(
-        `Task ${id} is not mapped to the ${this.crm.name} CRM adapter`,
-      );
-    return mapping;
-  }
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
 }

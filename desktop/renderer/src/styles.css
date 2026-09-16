@@ -178,10 +178,16 @@ textarea {
   align-items: center;
 }
 .sidebar nav button > span:first-child {
-  font-size: 18px;
   width: 20px;
   flex: none;
+  display: inline-flex;
+  align-items: center;
 }
+.sidebar nav button svg { display: block; }
+.setup-warning { color: #e9c875; overflow-wrap: anywhere; }
+.setup-error { color: #f5a5ae; overflow-wrap: anywhere; }
+.setup-error pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.setup-confirm { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; cursor: pointer; }
 .nav-label { min-width: 0; }
 .shell.sidebar-collapsed .sidebar { width: 76px; padding: 20px 10px; }
 .shell.sidebar-collapsed .sidebar-head { justify-items: center; }

@@ -6,7 +6,6 @@ import {
   type GitWorktreeDriver,
 } from "../src/application/worktree-service.js";
 import { ExecutionGuard } from "../src/application/execution-guard.js";
-import { MockCrmAdapter } from "../src/infrastructure/crm/mock-crm-adapter.js";
 import { openDatabase } from "../src/infrastructure/db/database.js";
 import { ProjectRepository } from "../src/infrastructure/repositories/project-repository.js";
 import { TaskRepository } from "../src/infrastructure/repositories/task-repository.js";
@@ -31,7 +30,7 @@ describe("platform execution foundation", () => {
       defaultBranch: "main",
       completionPolicy: "manual",
     });
-    const service = new TaskService(tasks, new MockCrmAdapter("unused.json"));
+    const service = new TaskService(tasks);
     const task = await service.capture({
       title: "Fix login",
       source: "manual",
@@ -101,7 +100,7 @@ describe("platform execution foundation", () => {
       defaultBranch: "main",
       completionPolicy: "manual",
     });
-    const service = new TaskService(tasks, new MockCrmAdapter("unused.json"));
+    const service = new TaskService(tasks);
     const first = await service.capture({
       title: "One",
       source: "manual",

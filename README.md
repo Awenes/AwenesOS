@@ -7,7 +7,7 @@ Version `0.1.0` is an Electron acceptance candidate. The Tauri migration begins 
 ## What AwenesOS does
 
 - Manages multiple local Git projects from one desktop application.
-- Captures manual tasks and tracker candidates without silently claiming them.
+- Captures tasks from any source and keeps unclaimed work in the inbox.
 - Runs `plan → implement → review → test → delivery` workflows.
 - Supports OpenAI and Anthropic through API keys.
 - Supports experimental Codex and Claude CLI connections using their existing login sessions.
@@ -40,14 +40,7 @@ Execution restrictions are enforced at the AwenesOS tool boundary. They must not
 
 ### Normal users
 
-Install [AwenesOS-Setup-0.1.0.exe](release/AwenesOS-Setup-0.1.0.exe). The installer contains the desktop runtime, so users do not need Node.js, npm, or pnpm.
-
-Current acceptance build:
-
-- Size: `119,127,148` bytes
-- SHA-256: `86B086500F5C068278EE042C75C3E5EDCBD9AD63BE288F9F00E8FFAD37D4BD25`
-
-Windows may display a reputation warning for an independently distributed acceptance build. Confirm that the filename and checksum match before continuing.
+Install the current Windows release build from the project's release assets. The installer contains the desktop runtime, so normal users do not need Node.js, npm, or pnpm. Verify the checksum published with that specific build before running it.
 
 ### Contributors
 
@@ -86,6 +79,15 @@ pnpm package:win
 9. Review browser evidence and the Git diff when applicable.
 10. Review the completion evidence and finish the task locally.
 
+### Set up a localhost browser test
+
+1. Open **Safety**, choose a project, and select **Suggest setup from project**.
+2. Review the suggested dev command, URL, health-check URL, and Chrome/Edge path. A `package.json` script and installed browser are detected when possible; non-Node projects can be entered manually.
+3. Confirm the exact command and localhost access, then save. Detection itself does not run any command or change permissions.
+4. Open a run with a task worktree and select **Run browser test**. AwenesOS starts the configured server in that worktree, waits for the health URL, runs checks in an isolated browser profile, and saves evidence.
+
+Use the base URL as the health-check URL when the app has no separate health endpoint. If several scripts are found or the port is unclear, select the right script and correct the URL before saving. This setup does not grant public-network access or Git push approval.
+
 ## Desktop areas
 
 | Area          | Purpose                                                                         |
@@ -117,7 +119,7 @@ Defaults are intentionally restrictive:
 
 - one writable task worktree per project;
 - provider network and executable access granted automatically when the project enables that option;
-- no localhost access until separately selected;
+- no localhost access until the developer confirms browser setup or selects it in Safety;
 - explicit command and environment-variable allowlists;
 - role-based tool access;
 - bounded agent turns, retries, and process duration;
@@ -126,7 +128,7 @@ Defaults are intentionally restrictive:
 - no access to the developer's normal browser profile; and
 - durable approval before Git push when required by policy.
 
-When automatic runtime access is disabled, provider traffic requires a manual public-network grant. Browser verification requires the separate localhost grant. Git push approval is never implied by agent runtime access.
+When automatic runtime access is disabled, provider traffic requires a manual public-network grant. Browser setup grants only localhost access after explicit confirmation. Git push approval is never implied by agent runtime access.
 
 ## Data and privacy
 
@@ -137,16 +139,7 @@ When automatic runtime access is disabled, provider traffic requires a manual pu
 
 ## Quality gates
 
-The current acceptance candidate passes:
-
-- TypeScript checks for core, Electron, and renderer code;
-- 49 automated tests across 23 test files;
-- a real isolated-Chrome browser test;
-- a real Git review/commit/push test against a temporary remote;
-- a production renderer/main-process build; and
-- packaged startup and archive-content verification.
-
-Physical QA remains mandatory before the Tauri migration.
+Before handoff, run `pnpm check`, `pnpm test`, `pnpm build`, and `pnpm test:desktop-smoke`. If the local pnpm launcher cannot run, the equivalent `npm run` scripts use the installed dependencies. Physical Windows QA remains mandatory before the Tauri migration.
 
 ## Documentation
 

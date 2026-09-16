@@ -4,7 +4,7 @@ import type { DesktopApi } from "./contracts.js";
 
 let pendingOperations = 0;
 const activityListeners = new Set<(pending: number) => void>();
-const feedbackListeners = new Set<(feedback: { message: string; tone: "success" | "error" }) => void>();
+const feedbackListeners = new Set<(feedback: { message: string; tone: "success" | "error"; details?: string }) => void>();
 const successMessages: Record<string, string> = {
   "awenes:project:add": "Project added",
   "awenes:task:capture": "Task started",
@@ -40,7 +40,9 @@ async function invoke<T>(channel: string, input?: unknown): Promise<T> {
     if (message) for (const listener of feedbackListeners) listener({ message, tone: "success" });
     return result;
   } catch (error) {
-    for (const listener of feedbackListeners) listener({ message: error instanceof Error ? error.message : String(error), tone: "error" });
+    const details = error instanceof Error ? error.message : String(error);
+    const message = /ENOENT|not found/i.test(details) ? "A required file or command could not be found. Check this project's setup." : /network access denied/i.test(details) ? "This run needs network access. Review the project's permissions." : /not allowed|permission|denied/i.test(details) ? "This action needs permission. Review the project's safety settings." : "That action could not be completed. Review the details and try again.";
+    for (const listener of feedbackListeners) listener({ message, tone: "error", details });
     throw error;
   } finally {
     pendingOperations = Math.max(0, pendingOperations - 1);
@@ -102,6 +104,8 @@ const api: DesktopApi = {
   gitPush: (runId) => invoke("awenes:git:push", runId),
   saveBrowserConfig: (input) =>
     invoke("awenes:browser:config", input),
+  suggestBrowserConfig: (projectId) =>
+    invoke("awenes:browser:suggest", projectId),
   saveBrowserCredential: (input) =>
     invoke("awenes:browser:credential", input),
   runBrowserTest: (runId) => invoke("awenes:browser:run", runId),

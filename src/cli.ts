@@ -3,14 +3,10 @@ import "dotenv/config";
 import { Command } from "commander";
 import { TaskService } from "./application/task-service.js";
 import { TaskSourceSchema, taskSources } from "./domain/task.js";
-import { ManualCrmAdapter } from "./infrastructure/crm/manual-crm-adapter.js";
 import { openDatabase } from "./infrastructure/db/database.js";
 import { TaskRepository } from "./infrastructure/repositories/task-repository.js";
 import { GuidedCli, ReadlineGuidedIO } from "./cli/guided-cli.js";
 import { readFile } from "node:fs/promises";
-import { TrackerImportService } from "./application/tracker-import-service.js";
-import { TrackerImportConfigSchema } from "./domain/tracker.js";
-import { CsvTrackerAdapter } from "./infrastructure/tracker/csv-tracker-adapter.js";
 import { LocalGitEvidenceCollector } from "./infrastructure/evidence/git-evidence-collector.js";
 import { NotificationService } from "./application/notification-service.js";
 import { createDatabaseBackup } from "./infrastructure/db/migration-runner.js";
@@ -32,7 +28,7 @@ import { AgentRoleRepository } from "./infrastructure/repositories/agent-role-re
 
 const { db, client, path: databasePath, migration } = await openDatabase();
 const repository = new TaskRepository(db);
-const service = new TaskService(repository, new ManualCrmAdapter(), "manual");
+const service = new TaskService(repository);
 const notifications = new NotificationService(repository);
 const reporting = new ReportingService(repository);
 const projectRepository = new ProjectRepository(db);
@@ -66,14 +62,8 @@ cli.command("confirm").argument("<id>").action(async (id) => print(await service
 cli.command("claim").argument("<id>").action(async (id) => print(await service.claim(id)));
 cli.command("reject").argument("<id>").action(async (id) => print(await service.reject(id)));
 
-cli.command("crm-map")
-  .description("Record an existing CRM task reference for manual coordination")
-  .argument("<id>").requiredOption("-p, --project <projectId>").requiredOption("-e, --external-id <id>").option("-u, --url <url>")
-  .action(async (id, options) => print(await service.mapToCrm(id, options.project, options.externalId, options.url)));
-cli.command("crm-updates").description("List CRM changes awaiting manual update and confirmation").action(async () => table(await service.pendingManualCrmUpdates()));
-cli.command("crm-confirm").description("Confirm that the current CRM instruction was manually applied").argument("<taskId>").action(async (taskId) => print(await service.confirmManualCrmUpdate(taskId)));
 cli.command("duration").description("Show active, paused, and calendar duration for a task").argument("<taskId>").action(async (taskId) => print(await service.duration(taskId)));
-cli.command("task-summary").description("Show task details, timing, evidence, mappings, and pending CRM work").argument("<taskId>").action(async (taskId) => print(await service.taskSummary(taskId)));
+cli.command("task-summary").description("Show task details, timing, and evidence").argument("<taskId>").action(async (taskId) => print(await service.taskSummary(taskId)));
 
 for (const command of ["start", "pause", "resume"] as const) {
   cli.command(command).argument("<id>").action(async (id) => print(await service[command](id)));
@@ -116,16 +106,6 @@ cli.command("role-create").description("Create a custom agent role from JSON").r
 cli.command("role-model").description("Assign a provider and model to an agent role").argument("<roleId>").requiredOption("--provider <providerId>").requiredOption("--model <modelId>").action(async (roleId, options) => print(await roles.assignModel(roleId, options.provider, options.model)));
 cli.command("role-enable").description("Enable an agent role").argument("<roleId>").action(async (roleId) => print(await roles.setEnabled(roleId, true)));
 cli.command("role-disable").description("Disable an agent role").argument("<roleId>").action(async (roleId) => print(await roles.setEnabled(roleId, false)));
-cli.command("tracker-updates").description("List completed tracker tasks awaiting your manual SharePoint update").action(async () => table(await service.pendingTrackerUpdates()));
-cli.command("tracker-confirm").description("Confirm that you manually updated the live SharePoint tracker").argument("<taskId>").action(async (taskId) => print(await service.confirmTrackerUpdate(taskId)));
-cli.command("tracker-import")
-  .description("Import tracker CSV rows as unassigned inbox candidates")
-  .argument("<file>")
-  .requiredOption("-c, --config <file>", "JSON column/status mapping configuration")
-  .action(async (file, options) => {
-    const config = TrackerImportConfigSchema.parse(JSON.parse(await readFile(options.config, "utf8")));
-    print(await new TrackerImportService(repository, new CsvTrackerAdapter()).import(file, config));
-  });
 
 try { await cli.parseAsync(process.argv); }
 catch (error) { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; }

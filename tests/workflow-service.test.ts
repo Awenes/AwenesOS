@@ -4,7 +4,6 @@ import { InstructionService } from "../src/application/instruction-service.js";
 import { ProjectService } from "../src/application/project-service.js";
 import { TaskService } from "../src/application/task-service.js";
 import { WorkflowService } from "../src/application/workflow-service.js";
-import { ManualCrmAdapter } from "../src/infrastructure/crm/manual-crm-adapter.js";
 import { openDatabase } from "../src/infrastructure/db/database.js";
 import { AgentRoleRepository } from "../src/infrastructure/repositories/agent-role-repository.js";
 import { InstructionRepository } from "../src/infrastructure/repositories/instruction-repository.js";
@@ -33,11 +32,7 @@ describe("WorkflowService", () => {
       defaultBranch: "main",
       completionPolicy: "manual",
     });
-    const taskService = new TaskService(
-      tasks,
-      new ManualCrmAdapter(),
-      "manual",
-    );
+    const taskService = new TaskService(tasks);
     const task = await taskService.capture({
       title: "Feature",
       source: "manual",

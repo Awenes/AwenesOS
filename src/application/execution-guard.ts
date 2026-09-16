@@ -18,13 +18,13 @@ export class ExecutionGuard {
 
   assertCommand(command: string): void {
     const executable = command
-      .replace(/\.cmd$/i, "")
+      .replace(/\.(cmd|exe)$/i, "")
       .split(/[\\/]/)
       .at(-1)
       ?.toLowerCase();
     const allowed = this.policy.commandAllowlist.map((item) =>
       item
-        .replace(/\.cmd$/i, "")
+        .replace(/\.(cmd|exe)$/i, "")
         .split(/[\\/]/)
         .at(-1)
         ?.toLowerCase(),

@@ -22,9 +22,13 @@ describe("desktop renderer responsiveness", () => {
         await page.addInitScript(() => {
           const longText = "verylongworkflowdetail".repeat(40);
           Object.assign(window, {
+            browserSetupSaves: 0,
             awenes: {
               onActivity: () => () => {},
               onFeedback: () => () => {},
+              executionPolicy: async () => ({ networkAccess: "none", autoGrantAgentAccess: false, commandAllowlist: ["git"], environmentAllowlist: [], processTimeoutSeconds: 900, requirePushApproval: true, isolatedBrowserProfile: true }),
+              suggestBrowserConfig: async () => ({ startCommand: "pnpm", startArgs: ["dev"], baseUrl: "http://localhost:5173", healthCheckUrl: "http://localhost:5173", browserExecutable: "C:\\chrome.exe", scriptOptions: ["dev"], warnings: [] }),
+              saveBrowserConfig: async (input: unknown) => { (window as any).browserSetupSaves += 1; (window as any).lastBrowserSetup = input; },
               runDetails: async () => ({
                 run: { id: "run", taskId: "test", projectId: "project", status: "failed", currentStage: "plan" },
                 steps: [], approvals: [], plans: [], interventions: [], browserEvidence: [],
@@ -32,7 +36,7 @@ describe("desktop renderer responsiveness", () => {
                 delivery: { review: { status: "changed", diffStat: longText, diff: longText } },
               }),
               snapshot: async () => ({
-                projects: [],
+                projects: [{ id: "project", name: "Sample", repositoryRoot: "C:\\sample", completionPolicy: "manual", defaultBranch: "main" }],
                 tasks: [{
                   id: "test", projectId: null, title: longText, source: "manual",
                   status: "completed", updatedAt: new Date().toISOString(),
@@ -56,6 +60,7 @@ describe("desktop renderer responsiveness", () => {
         });
         await page.goto(`http://127.0.0.1:${address.port}/`);
         await page.getByRole("button", { name: "Notifications" }).click();
+        expect(await page.locator("nav svg").count()).toBe(9);
         await page.getByText("Agent run completed").waitFor();
         const hasOverflow = () => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
         expect(await hasOverflow()).toBe(false);
@@ -76,6 +81,14 @@ describe("desktop renderer responsiveness", () => {
         await page.getByRole("button", { name: "Collapse sidebar" }).click();
         await page.setViewportSize({ width: 960, height: 800 });
         expect(await hasOverflow()).toBe(false);
+        await page.getByRole("button", { name: "Safety" }).click();
+        await page.getByRole("button", { name: "Suggest setup from project" }).click();
+        await page.getByText("Command preview:").waitFor();
+        expect(await page.evaluate(() => (window as any).browserSetupSaves)).toBe(0);
+        await page.getByLabel("I reviewed this command and localhost access.").check();
+        await page.getByRole("button", { name: "Save browser setup" }).click();
+        expect(await page.evaluate(() => (window as any).browserSetupSaves)).toBe(1);
+        expect(await page.evaluate(() => (window as any).lastBrowserSetup)).toMatchObject({ confirmLocalhostAccess: true, config: { startCommand: "pnpm", baseUrl: "http://localhost:5173" } });
         await page.close();
       } finally {
         await browser.close();

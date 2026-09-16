@@ -70,6 +70,15 @@ export const BrowserTestConfigSchema = z
         });
   });
 export type BrowserTestConfig = z.infer<typeof BrowserTestConfigSchema>;
+export interface BrowserSetupSuggestion {
+  startCommand: string;
+  startArgs: string[];
+  baseUrl: string;
+  healthCheckUrl: string;
+  browserExecutable: string;
+  scriptOptions: string[];
+  warnings: string[];
+}
 export type BrowserAssertion = z.infer<typeof BrowserAssertionSchema>;
 export interface BrowserTestEvidence {
   id: string;
