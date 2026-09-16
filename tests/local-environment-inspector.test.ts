@@ -30,13 +30,16 @@ function project(repositoryRoot: string): Project {
 }
 
 describe("LocalEnvironmentInspector", () => {
+  // Each case spawns several real child processes (git, node, worktree
+  // checks); under heavy concurrent system load that can outrun vitest's
+  // 5s default, so these get a more generous budget.
   it("checks only git plus whatever the project's own allowlist declares", async () => {
     const report = await new LocalEnvironmentInspector().inspect(
       project(await repo()),
       ExecutionPolicySchema.parse({ commandAllowlist: [] }),
     );
     expect(report.checks.map((check) => check.name)).toEqual(["repository", "git", "worktree", "browser"]);
-  });
+  }, 20_000);
 
   it("checks every allowlisted command without checking git twice", async () => {
     const report = await new LocalEnvironmentInspector().inspect(
@@ -47,7 +50,7 @@ describe("LocalEnvironmentInspector", () => {
     expect(names.filter((name) => name.toLowerCase() === "git")).toHaveLength(1);
     expect(report.checks.find((check) => check.name === "node")).toMatchObject({ ready: true, required: true });
     expect(names).toContain("definitely-not-a-real-command-xyz");
-  });
+  }, 20_000);
 
   it("fails readiness when a required allowlisted command is unavailable", async () => {
     const report = await new LocalEnvironmentInspector().inspect(
@@ -59,7 +62,7 @@ describe("LocalEnvironmentInspector", () => {
       required: true,
     });
     expect(report.ready).toBe(false);
-  });
+  }, 20_000);
 
   it("no longer requires pnpm for a project that removed it from the allowlist", async () => {
     const report = await new LocalEnvironmentInspector().inspect(
@@ -67,5 +70,5 @@ describe("LocalEnvironmentInspector", () => {
       ExecutionPolicySchema.parse({ commandAllowlist: ["git", "node"] }),
     );
     expect(report.checks.some((check) => check.name === "pnpm")).toBe(false);
-  });
+  }, 20_000);
 });

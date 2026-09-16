@@ -1,6 +1,7 @@
 import type { DesktopSnapshot } from "../../../contracts";
 import { navigation, type View } from "../utils/presentation";
 import { NavigationIcon } from "./navigation-icon";
+import { BrandMark } from "./brand-mark";
 
 interface AppSidebarProps {
   view: View;
@@ -23,7 +24,7 @@ export function AppSidebar({ view, collapsed, setView, toggle, snapshot }: AppSi
   };
   return <aside className="sidebar">
     <div className="sidebar-head">
-      <div className="brand"><span className="brand-mark">A</span><div className="brand-copy"><strong>AwenesOS</strong><small>Developer command center</small></div></div>
+      <div className="brand"><span className="brand-mark"><BrandMark /></span><div className="brand-copy"><strong>AwenesOS</strong><small>Developer command center</small></div></div>
       <button type="button" className="sidebar-toggle" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} aria-expanded={!collapsed} title={collapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={toggle}>{collapsed ? "»" : "«"}</button>
     </div>
     <nav aria-label="Primary navigation">
