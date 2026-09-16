@@ -16,7 +16,10 @@ export class ProjectService {
 
   list() { return this.repository.list(); }
 
-  async readiness(id: string) { return this.inspector.inspect(await this.repository.get(id)); }
+  async readiness(id: string) {
+    const [project, policy] = await Promise.all([this.repository.get(id), this.repository.executionPolicy(id)]);
+    return this.inspector.inspect(project, policy);
+  }
 
   async setCompletionPolicy(id: string, completionPolicy: CompletionPolicy) {
     return this.repository.setCompletionPolicy(id, completionPolicy);

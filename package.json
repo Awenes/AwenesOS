@@ -59,7 +59,7 @@
     "@libsql/client": "^0.15.15",
     "commander": "^14.0.1",
     "dotenv": "^17.2.2",
-    "drizzle-orm": "^0.44.5",
+    "drizzle-orm": "^0.45.2",
     "playwright-core": "^1.63.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

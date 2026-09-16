@@ -91,7 +91,7 @@ export function readinessGuidance(name: string) {
       repository: "Confirm the folder path is correct and that this account can read and write it, then select Check project setup again.",
       git: "Install Git and make sure it is on your PATH, then select Check project setup again.",
       node: "Install Node.js 22 or later and make sure it is on your PATH, then select Check project setup again.",
-      pnpm: "Install pnpm — for example, run \"npm install -g pnpm\" in a terminal — and make sure it is on your PATH, then select Check project setup again.",
+      pnpm: "Install pnpm (for example, run \"npm install -g pnpm\" in a terminal) and make sure it is on your PATH, then select Check project setup again.",
       worktree: "Confirm this folder is a Git repository that supports worktrees, then select Check project setup again.",
       browser: "Install Google Chrome or Microsoft Edge to enable isolated localhost browser testing.",
     }[name] ?? "Resolve this outside AwenesOS, then select Check project setup again."

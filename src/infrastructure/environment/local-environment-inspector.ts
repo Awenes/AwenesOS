@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type {
   EnvironmentInspector,
+  ExecutionPolicy,
   Project,
   ReadinessCheck,
   ReadinessReport,
@@ -12,21 +13,13 @@ import type {
 const execute = promisify(execFile);
 
 export class LocalEnvironmentInspector implements EnvironmentInspector {
-  async inspect(project: Project): Promise<ReadinessReport> {
+  async inspect(project: Project, policy: ExecutionPolicy): Promise<ReadinessReport> {
     const checks: ReadinessCheck[] = [];
     checks.push(await directoryCheck(project.repositoryRoot));
     checks.push(await commandCheck("git", ["--version"], true));
-    checks.push(
-      await commandCheck(process.execPath, ["--version"], true, "node"),
-    );
-    checks.push(
-      await commandCheck(
-        process.platform === "win32" ? "pnpm.cmd" : "pnpm",
-        ["--version"],
-        true,
-        "pnpm",
-      ),
-    );
+    for (const command of policy.commandAllowlist)
+      if (command.trim().toLowerCase() !== "git")
+        checks.push(await commandCheck(command, ["--version"], true));
     checks.push(await repositoryCheck(project.repositoryRoot));
     checks.push(await browserCheck());
     return {
@@ -124,27 +117,22 @@ async function commandCheck(
   command: string,
   args: string[],
   required: boolean,
-  name = command,
 ): Promise<ReadinessCheck> {
-  try {
-    const { stdout, stderr } = await execute(command, args, {
-      timeout: 5000,
-      windowsHide: true,
-    });
-    return {
-      name: name as ReadinessCheck["name"],
-      ready: true,
-      required,
-      detail: (stdout || stderr).trim(),
-    };
-  } catch (error) {
-    return {
-      name: name as ReadinessCheck["name"],
-      ready: false,
-      required,
-      detail: message(error),
-    };
+  const bareName = !/[\\/.]/.test(command);
+  const candidates = process.platform === "win32" && bareName ? [command, `${command}.cmd`, `${command}.exe`] : [command];
+  let lastError: unknown;
+  for (const candidate of candidates) {
+    try {
+      const { stdout, stderr } = await execute(candidate, args, {
+        timeout: 5000,
+        windowsHide: true,
+      });
+      return { name: command, ready: true, required, detail: (stdout || stderr).trim() };
+    } catch (error) {
+      lastError = error;
+    }
   }
+  return { name: command, ready: false, required, detail: message(lastError) };
 }
 
 function message(error: unknown) {

@@ -31,8 +31,9 @@ export interface Project extends Omit<RegisterProject, "autonomyMode"> {
   updatedAt: Date;
 }
 
-export type ReadinessCheckName =
-  "repository" | "git" | "node" | "pnpm" | "worktree" | "browser";
+// "repository", "worktree", and "browser" are always checked; every other
+// name is a command from that project's own ExecutionPolicy.commandAllowlist.
+export type ReadinessCheckName = string;
 export interface ReadinessCheck {
   name: ReadinessCheckName;
   ready: boolean;
@@ -47,7 +48,7 @@ export interface ReadinessReport {
 }
 
 export interface EnvironmentInspector {
-  inspect(project: Project): Promise<ReadinessReport>;
+  inspect(project: Project, policy: ExecutionPolicy): Promise<ReadinessReport>;
 }
 
 export interface GitRepositoryInitializer {

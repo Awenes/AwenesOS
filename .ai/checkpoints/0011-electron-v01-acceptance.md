@@ -15,7 +15,7 @@ Status: implementation and automated verification complete; physical developer a
 | Desktop product shell            | Onboarding, projects, tasks and timing, runs, approvals, agents, providers, notifications, safety/settings, error surfacing and recovery                             | Renderer/main/preload type checks and packaged startup capture       |
 | Windows packaging                | NSIS installer, embedded Electron runtime, branded icon, native dependencies and packaged Playwright runtime                                                         | Installer build plus explicit `app.asar` dependency inspection       |
 
-Automated release gate on 2026-09-11: `pnpm check`, 49 tests across 23 files, and `pnpm build` passed. The acceptance installer is `release/AwenesOS-Setup-0.1.0.exe`, 119,127,148 bytes, SHA-256 `86B086500F5C068278EE042C75C3E5EDCBD9AD63BE288F9F00E8FFAD37D4BD25`.
+Automated release gate on 2026-09-16: `pnpm check`, 70 tests across 33 files, `pnpm build`, and `pnpm test:desktop-smoke` passed, plus a clean `pnpm audit` (the `drizzle-orm` SQL-identifier-escaping advisory, GHSA-gpj5-g38j-94v9, was patched by bumping to `^0.45.2`). The acceptance installer is `release/AwenesOS-Setup-0.1.0.exe`, 119,069,225 bytes, SHA-256 `16858B10AFF826601565667E616699F34BE67933191FC8B44749A113F6DEC241`.
 
 ## Physical acceptance test
 
