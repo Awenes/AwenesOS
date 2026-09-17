@@ -33,7 +33,7 @@
       "provider": "github",
       "owner": "Awenes",
       "repo": "AwenesOS",
-      "releaseType": "release"
+      "releaseType": "draft"
     },
     "directories": {
       "output": "release"
