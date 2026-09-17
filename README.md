@@ -152,4 +152,4 @@ Before handoff, run `pnpm check`, `pnpm test`, `pnpm build`, and `pnpm test:desk
 
 ## License
 
-No open-source license has been declared. Treat the repository as proprietary unless the owner adds a license.
+MIT license.
