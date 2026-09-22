@@ -31,7 +31,7 @@ export class ApiAgentRunner implements AgentRunner {
       { role: "developer", content: input.instructions },
       {
         role: "user",
-        content: `Task: ${input.taskTitle}\n${input.taskDescription}\nStage: ${input.stage}`,
+        content: `Task: ${input.taskTitle}\n${input.taskDescription}\nStage: ${input.stage}${priorContextBlock(input.priorContext)}`,
       },
     ];
     let transcript = "";
@@ -78,7 +78,7 @@ export class ApiAgentRunner implements AgentRunner {
     const messages: any[] = [
       {
         role: "user",
-        content: `${input.instructions}\n\nTask: ${input.taskTitle}\n${input.taskDescription}\nStage: ${input.stage}`,
+        content: `${input.instructions}\n\nTask: ${input.taskTitle}\n${input.taskDescription}\nStage: ${input.stage}${priorContextBlock(input.priorContext)}`,
       },
     ];
     let transcript = "";
@@ -151,6 +151,9 @@ export class ApiAgentRunner implements AgentRunner {
       );
     return response.json() as Promise<any>;
   }
+}
+function priorContextBlock(priorContext: string) {
+  return priorContext ? `\n\n${priorContext}` : "";
 }
 function parseCall(id: string, name: AgentToolCall["name"], args: string) {
   return { id, name, arguments: JSON.parse(args) as Record<string, unknown> };

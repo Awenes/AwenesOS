@@ -25,6 +25,7 @@ const input = {
   taskTitle: "Task",
   taskDescription: "Description",
   stage: "implement",
+  priorContext: "",
   worktreePath: "C:\\work",
   timeoutSeconds: 30,
   maxTurns: 3,
@@ -80,6 +81,31 @@ describe("ApiAgentRunner", () => {
       { id: "1", name: "read_file", arguments: { path: "src/a.ts" } },
     ]);
     expect(result).toMatchObject({ success: true, summary: "Verified" });
+  });
+  it("includes the approved plan and prior evidence in the initial prompt", async () => {
+    const host: AgentToolHost = { execute: async () => "contents" };
+    let firstBody: any;
+    const fakeFetch = async (_url: any, options: any) => {
+      firstBody ??= JSON.parse(options.body);
+      return new Response(
+        JSON.stringify({ output: [], output_text: "Verified" }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    };
+    const vault: SecretVault = {
+      set: async () => {},
+      get: async () => "key",
+      delete: async () => {},
+    };
+    await new ApiAgentRunner(vault, () => host, fakeFetch as typeof fetch).run(
+      {
+        ...input,
+        priorContext:
+          "## Approved plan (v1)\nAdd a null check before dereferencing.",
+      },
+    );
+    expect(firstBody.input[1].content).toContain("Approved plan");
+    expect(firstBody.input[1].content).toContain("null check");
   });
   it("stops at the configured role turn limit", async () => {
     const host: AgentToolHost = { execute: async () => "contents" };

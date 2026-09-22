@@ -7,6 +7,7 @@ export interface AgentRunRequest {
   taskTitle: string;
   taskDescription: string;
   stage: string;
+  priorContext: string;
   worktreePath: string;
   timeoutSeconds: number;
   maxTurns: number;

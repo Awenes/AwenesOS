@@ -1,6 +1,7 @@
 import type { AgentRunner } from "../domain/agent-runner.js";
 import type { ExecutionPolicy, TaskWorktree } from "../domain/project.js";
 import type { ProviderConnection } from "../domain/provider.js";
+import type { WorkflowPlan, WorkflowStep } from "../domain/workflow.js";
 import type { AgentRoleRepository } from "../infrastructure/repositories/agent-role-repository.js";
 import type { ProjectRepository } from "../infrastructure/repositories/project-repository.js";
 import type { ProviderRepository } from "../infrastructure/repositories/provider-repository.js";
@@ -70,6 +71,12 @@ export class WorkflowEngine {
     }
     const task = await this.tasks.get(run.taskId);
     const project = await this.projects.get(run.projectId);
+    const plans = await this.runs.plans(runId);
+    const approvedPlan = plans.find((value) => value.status === "approved");
+    const priorSteps = steps.filter(
+      (value) => value.ordinal < step.ordinal && value.output,
+    );
+    const priorContext = buildPriorContext(approvedPlan, priorSteps);
     let policy = await this.projects.executionPolicy(run.projectId);
     if (policy.autoGrantAgentAccess) {
       const command = provider.command?.trim();
@@ -98,6 +105,7 @@ export class WorkflowEngine {
         taskTitle: task.title,
         taskDescription: task.assignmentDescription,
         stage: step.stage,
+        priorContext,
         worktreePath: worktree.path,
         timeoutSeconds: role.limits.timeoutSeconds,
         maxTurns: role.limits.maxTurns,
@@ -139,4 +147,14 @@ export class WorkflowEngine {
       return this.runs.setState(runId, "failed", step.stage, detail);
     }
   }
+}
+function buildPriorContext(
+  plan: WorkflowPlan | undefined,
+  priorSteps: WorkflowStep[],
+) {
+  const sections: string[] = [];
+  if (plan) sections.push(`## Approved plan (v${plan.version})\n${plan.content}`);
+  for (const value of priorSteps)
+    sections.push(`## ${value.stage} evidence\n${value.output}`);
+  return sections.join("\n\n");
 }

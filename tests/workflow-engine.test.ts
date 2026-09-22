@@ -102,6 +102,7 @@ describe("WorkflowEngine", () => {
     expect(seen).toMatchObject({
       instructions: "Snapshot",
       worktreePath: "C:\\work",
+      priorContext: "",
     });
     expect((await runs.steps(run.id))[0]).toMatchObject({
       status: "passed",
@@ -111,6 +112,113 @@ describe("WorkflowEngine", () => {
       status: "running",
       currentStage: null,
     });
+    opened.client.close();
+  });
+  it("passes the approved plan and prior stage evidence into later stages", async () => {
+    const opened = await openDatabase(":memory:");
+    const tasks = new TaskRepository(opened.db),
+      projects = new ProjectRepository(opened.db),
+      roles = new AgentRoleRepository(opened.db),
+      providers = new ProviderRepository(opened.db),
+      runs = new WorkflowRepository(opened.db);
+    const project = await projects.create({
+      name: "App",
+      repositoryRoot: "C:\\app",
+      defaultBranch: "main",
+      completionPolicy: "manual",
+    });
+    await projects.saveExecutionPolicy(project.id, {
+      networkAccess: "public",
+      autoGrantAgentAccess: true,
+      environmentAllowlist: [],
+      commandAllowlist: ["codex"],
+      processTimeoutSeconds: 900,
+      requirePushApproval: true,
+      isolatedBrowserProfile: true,
+    });
+    const task = await tasks.create({
+      title: "Fix",
+      source: "manual",
+      assignmentDescription: "Bug",
+      assignedToMe: true,
+      occurredAt: new Date(),
+    });
+    await tasks.assignProject(task.id, project.id);
+    const role = await roles.create(
+      {
+        projectId: null,
+        slug: "worker",
+        name: "Worker",
+        description: "Works",
+        promptTemplate: "Default",
+        providerId: null,
+        modelId: null,
+        capabilities: ["code"],
+        limits: { maxTurns: 2, timeoutSeconds: 30, maxRetries: 1 },
+        enabled: true,
+      },
+      false,
+    );
+    const provider = await providers.create({
+      name: "Provider",
+      kind: "openai",
+      authMethod: "cli",
+      command: "codex",
+      models: ["model"],
+    });
+    await providers.recordCheck(provider.id, "ready", null);
+    await roles.assignModel(role.id, provider.id, "model");
+    const run = await runs.create(task.id, project.id);
+    await runs.addStep(run.id, 0, "plan", role.id, { content: "Plan role" });
+    const planStep = (await runs.steps(run.id))[0]!;
+    await runs.startStep(planStep.id);
+    await runs.finishStep(
+      planStep.id,
+      true,
+      "Investigated the bug and reproduced it locally",
+    );
+    await runs.createPlan(
+      run.id,
+      "1. Add a null check\n2. Add a regression test",
+      false,
+    );
+    await runs.addStep(run.id, 1, "implement", role.id, {
+      content: "Snapshot",
+    });
+    await runs.setState(run.id, "running", "implement");
+    let seen: any;
+    const runner: AgentRunner = {
+      run: async (input) => {
+        seen = input;
+        return { success: true, summary: "done", transcript: "evidence" };
+      },
+    };
+    const factory: AgentRunnerFactory = { create: () => runner };
+    const worktree = {
+      id: "w",
+      taskId: task.id,
+      projectId: project.id,
+      path: "C:\\work",
+      branch: "b",
+      baseBranch: "main",
+      status: "active" as const,
+      createdAt: new Date(),
+      releasedAt: null,
+    };
+    const engine = new WorkflowEngine(
+      runs,
+      tasks,
+      projects,
+      roles,
+      providers,
+      { create: async () => worktree } as any,
+      factory,
+    );
+    await engine.executeNext(run.id);
+    expect(seen.priorContext).toContain("Add a null check");
+    expect(seen.priorContext).toContain(
+      "Investigated the bug and reproduced it locally",
+    );
     opened.client.close();
   });
   it("grants provider runtime access automatically without disabling push approval", async () => {
