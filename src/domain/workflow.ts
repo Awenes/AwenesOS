@@ -31,6 +31,7 @@ export const ApprovalKindSchema = z.enum([
   "push",
   "completion",
   "plan",
+  "stage",
 ]);
 export const InterventionKindSchema = z.enum(["setup", "question", "permission", "failure", "review"]);
 export type InterventionKind = z.infer<typeof InterventionKindSchema>;

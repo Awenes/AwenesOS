@@ -1,9 +1,10 @@
-import type { AgentRoleInput } from "../src/domain/agent-role.js";
+import type { AgentCapability, AgentRoleInput } from "../src/domain/agent-role.js";
 import type {
+  AutonomyMode,
   CompletionPolicy,
   ExecutionPolicy,
 } from "../src/domain/project.js";
-import type { TaskSource } from "../src/domain/task.js";
+import type { TaskSource, TaskStatus } from "../src/domain/task.js";
 import type {
   ProviderAuthMethod,
   ProviderKind,
@@ -12,6 +13,12 @@ import type {
 import type { BrowserTestConfig, BrowserSetupSuggestion } from "../src/domain/browser-test.js";
 import type { SkillSnapshotInput } from "../src/domain/instruction.js";
 import type { NotificationKind } from "../src/domain/notification.js";
+import type {
+  ApprovalKind,
+  WorkflowRunStatus,
+  WorkflowStage,
+  WorkflowStepStatus,
+} from "../src/domain/workflow.js";
 
 export interface DesktopSnapshot {
   projects: Array<{
@@ -20,14 +27,14 @@ export interface DesktopSnapshot {
     repositoryRoot: string;
     defaultBranch: string;
     completionPolicy: CompletionPolicy;
-    autonomyMode: "guided" | "balanced" | "autonomous";
+    autonomyMode: AutonomyMode;
   }>;
   tasks: Array<{
     id: string;
     projectId: string | null;
     title: string;
     source: TaskSource;
-    status: string;
+    status: TaskStatus;
     updatedAt: Date;
   }>;
   archivedTasks: Array<{
@@ -35,7 +42,7 @@ export interface DesktopSnapshot {
     projectId: string | null;
     title: string;
     source: TaskSource;
-    status: string;
+    status: TaskStatus;
     updatedAt: Date;
   }>;
   roles: Array<{
@@ -45,7 +52,7 @@ export interface DesktopSnapshot {
     description: string;
     providerId: string | null;
     modelId: string | null;
-    capabilities: string[];
+    capabilities: AgentCapability[];
     enabled: boolean;
     builtIn: boolean;
   }>;
@@ -64,27 +71,27 @@ export interface DesktopSnapshot {
     id: string;
     taskId: string;
     projectId: string;
-    status: string;
-    currentStage: string | null;
+    status: WorkflowRunStatus;
+    currentStage: WorkflowStage | null;
     error: string | null;
     updatedAt: Date;
-    stepStatus: string | null;
+    stepStatus: WorkflowStepStatus | null;
   }>;
   archivedRuns: Array<{
     id: string;
     taskId: string;
     projectId: string;
-    status: string;
-    currentStage: string | null;
+    status: WorkflowRunStatus;
+    currentStage: WorkflowStage | null;
     error: string | null;
     updatedAt: Date;
-    stepStatus: string | null;
+    stepStatus: WorkflowStepStatus | null;
   }>;
   approvals: Array<{
     id: string;
     runId: string;
-    kind: string;
-    status: string;
+    kind: ApprovalKind;
+    status: "pending" | "approved" | "rejected";
     detail: string;
     requestedAt: Date;
     planContent?: string;
@@ -118,7 +125,7 @@ export interface DesktopApi {
     repositoryRoot: string;
     defaultBranch: string;
     completionPolicy: CompletionPolicy;
-    autonomyMode: "guided" | "balanced" | "autonomous";
+    autonomyMode: AutonomyMode;
     initializeGit: boolean;
   }): Promise<void>;
   captureTask(input: {
@@ -131,7 +138,15 @@ export interface DesktopApi {
   taskAction(input: {
     taskId: string;
     action:
-      "claim" | "start" | "pause" | "resume" | "archive" | "restore" | "delete";
+      | "confirm"
+      | "claim"
+      | "reject"
+      | "start"
+      | "pause"
+      | "resume"
+      | "archive"
+      | "restore"
+      | "delete";
   }): Promise<void>;
   projectReadiness(projectId: string): Promise<unknown>;
   executionPolicy(projectId: string): Promise<ExecutionPolicy>;

@@ -70,6 +70,10 @@ export const BrowserTestConfigSchema = z
         });
   });
 export type BrowserTestConfig = z.infer<typeof BrowserTestConfigSchema>;
+export const BrowserCredentialInputSchema = z.object({
+  key: z.string().trim().min(1).max(120),
+  value: z.string().min(1).max(10_000),
+});
 export interface BrowserSetupSuggestion {
   startCommand: string;
   startArgs: string[];

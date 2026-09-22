@@ -16,6 +16,10 @@ export interface AgentRunnerFactory {
     policy: ExecutionPolicy,
   ): AgentRunner;
 }
+export interface GitDeliveryPort {
+  commit(runId: string, message: string): Promise<unknown>;
+  push(runId: string, remote?: string): Promise<unknown>;
+}
 export class WorkflowEngine {
   constructor(
     private runs: WorkflowRepository,
@@ -25,6 +29,7 @@ export class WorkflowEngine {
     private providers: ProviderRepository,
     private worktrees: WorktreeService,
     private agents: AgentRunnerFactory,
+    private delivery: GitDeliveryPort,
   ) {}
   async executeNext(runId: string) {
     const run = await this.runs.get(runId);
@@ -41,8 +46,12 @@ export class WorkflowEngine {
       if (
         project.completionPolicy === "auto_push" &&
         !policy.requirePushApproval
-      )
-        return this.runs.setState(runId, "running", "delivery");
+      ) {
+        const task = await this.tasks.get(run.taskId);
+        await this.delivery.commit(runId, `feat: complete ${task.title}`);
+        await this.delivery.push(runId);
+        return this.runs.get(runId);
+      }
       const kind =
         project.completionPolicy === "manual" ? "completion" : "push";
       await this.runs.requestApproval(
@@ -135,6 +144,13 @@ export class WorkflowEngine {
           );
           return this.runs.setState(runId, "awaiting_approval", "plan");
         }
+      } else if (project.autonomyMode === "guided") {
+        await this.runs.requestApproval(
+          runId,
+          "stage",
+          `Review ${step.stage} output before continuing.`,
+        );
+        return this.runs.setState(runId, "awaiting_approval", step.stage);
       }
       const refreshed = await this.runs.steps(runId);
       const next = refreshed.find(

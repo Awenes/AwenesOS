@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { GitDeliveryService } from "../src/application/git-delivery-service.js";
+import { WorktreeService } from "../src/application/worktree-service.js";
 import type { GitDeliveryDriver } from "../src/domain/git-delivery.js";
 import { openDatabase } from "../src/infrastructure/db/database.js";
 import { GitDeliveryRepository } from "../src/infrastructure/repositories/git-delivery-repository.js";
 import { ProjectRepository } from "../src/infrastructure/repositories/project-repository.js";
 import { TaskRepository } from "../src/infrastructure/repositories/task-repository.js";
 import { WorkflowRepository } from "../src/infrastructure/repositories/workflow-repository.js";
+function noopWorktrees(projects: ProjectRepository, tasks: TaskRepository) {
+  return new WorktreeService(projects, tasks, {
+    create: async () => {},
+    remove: async () => {},
+  });
+}
 describe("GitDeliveryService", () => {
   it("records review and commit but requires explicit push approval", async () => {
     const opened = await openDatabase(":memory:");
@@ -53,7 +60,13 @@ describe("GitDeliveryService", () => {
         calls.push(`push:${remote}:${branch}`);
       },
     };
-    const service = new GitDeliveryService(deliveries, runs, projects, git);
+    const service = new GitDeliveryService(
+      deliveries,
+      runs,
+      projects,
+      git,
+      noopWorktrees(projects, tasks),
+    );
     expect((await service.review(run.id)).review.diff).toBe("patch");
     expect((await service.commit(run.id, "feat: finish")).commitSha).toBe(
       "abc",
@@ -111,6 +124,7 @@ describe("GitDeliveryService", () => {
         runs,
         projects,
         git,
+        noopWorktrees(projects, tasks),
       ).commit(run.id, "message"),
     ).rejects.toThrow("manual");
     opened.client.close();

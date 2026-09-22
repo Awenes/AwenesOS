@@ -38,17 +38,24 @@ export class PlaywrightBrowserAutomation implements BrowserAutomation {
       const page = context.pages()[0] ?? (await context.newPage());
       const consoleErrors: string[] = [],
         failedRequests: string[] = [];
+      const redact = (text: string) => redactCredentials(text, credentials);
       page.on("console", (message) => {
-        if (message.type() === "error") consoleErrors.push(message.text());
+        if (message.type() === "error")
+          consoleErrors.push(redact(message.text()));
       });
       page.on("requestfailed", (request) =>
         failedRequests.push(
-          `${request.method()} ${request.url()}: ${request.failure()?.errorText ?? "failed"}`,
+          redact(
+            `${request.method()} ${request.url()}: ${request.failure()?.errorText ?? "failed"}`,
+          ),
         ),
+      );
+      const usesCredentials = config.actions.some(
+        (action) => action.type === "fill",
       );
       await context.tracing.start({
         screenshots: true,
-        snapshots: true,
+        snapshots: !usesCredentials,
         sources: true,
       });
       const response = await page.goto(config.baseUrl, {
@@ -136,4 +143,12 @@ async function healthy(url: string) {
 async function ensure(result: { exitCode: number | null; stderr: string }) {
   if (result.exitCode !== 0)
     throw new Error(result.stderr || `Command exited ${result.exitCode}`);
+}
+function redactCredentials(text: string, credentials: Record<string, string>) {
+  let result = text;
+  for (const value of Object.values(credentials)) {
+    if (!value) continue;
+    result = result.split(value).join("[redacted]");
+  }
+  return result;
 }

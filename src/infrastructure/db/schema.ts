@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const tasks = sqliteTable("tasks", {
   id: text("id").primaryKey(),
@@ -104,7 +104,7 @@ export const taskWorktrees = sqliteTable("task_worktrees", {
   id: text("id").primaryKey(), taskId: text("task_id").notNull().references(() => tasks.id), projectId: text("project_id").notNull().references(() => projects.id),
   path: text("path").notNull(), branch: text("branch").notNull(), baseBranch: text("base_branch").notNull(), status: text("status").notNull(),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(), releasedAt: integer("released_at", { mode: "timestamp_ms" })
-}, (table) => [uniqueIndex("task_worktrees_task_unique").on(table.taskId), uniqueIndex("task_worktrees_path_unique").on(table.path)]);
+}, (table) => [uniqueIndex("task_worktrees_task_unique").on(table.taskId), uniqueIndex("task_worktrees_path_unique").on(table.path), index("task_worktrees_project_idx").on(table.projectId)]);
 
 export const agentRoles = sqliteTable("agent_roles", {
   id: text("id").primaryKey(),

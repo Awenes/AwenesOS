@@ -584,8 +584,7 @@ pnpm build
 Expected baseline for this acceptance candidate:
 
 - type checks pass;
-- 23 test files pass;
-- 49 tests pass;
+- every test file `pnpm test` reports passes, with zero failures (the exact file/test count changes as the suite grows — check the `vitest run` summary line rather than a fixed number);
 - the real Chrome test runs when Chrome is installed; and
 - the real Git integration test creates, commits, and pushes only inside temporary fixtures.
 

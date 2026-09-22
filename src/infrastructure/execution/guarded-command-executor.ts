@@ -54,6 +54,21 @@ export class GuardedCommandExecutor implements ManagedCommandExecutor {
         stderr = "",
         timedOut = false,
         settled = false;
+      let graceTimer: NodeJS.Timeout | undefined;
+      const settle = (code: number | null) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        clearTimeout(graceTimer);
+        resolve({
+          exitCode: code,
+          stdout,
+          stderr,
+          timedOut,
+          startedAt,
+          completedAt: new Date(),
+        });
+      };
       const append = (current: string, value: Buffer) =>
         `${current}${value.toString()}`.slice(-MAX_OUTPUT);
       child.stdout.on("data", (value) => (stdout = append(stdout, value)));
@@ -62,32 +77,21 @@ export class GuardedCommandExecutor implements ManagedCommandExecutor {
         if (!settled) {
           settled = true;
           clearTimeout(timer);
+          clearTimeout(graceTimer);
           reject(error);
         }
       });
-      child.on("close", (code) => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timer);
-          resolve({
-            exitCode: code,
-            stdout,
-            stderr,
-            timedOut,
-            startedAt,
-            completedAt: new Date(),
-          });
-        }
-      });
+      child.on("close", (code) => settle(code));
       if (input.stdin) child.stdin.write(input.stdin);
       child.stdin.end();
       const timeoutSeconds = Math.min(
         input.timeoutSeconds ?? this.policy.processTimeoutSeconds,
         this.policy.processTimeoutSeconds,
       );
-      const timer = setTimeout(async () => {
+      const timer = setTimeout(() => {
         timedOut = true;
-        await terminateTree(child.pid);
+        void terminateTree(child.pid);
+        graceTimer = setTimeout(() => settle(null), 5_000);
       }, timeoutSeconds * 1000);
     });
   }

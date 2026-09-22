@@ -7,12 +7,14 @@ import { ExecutionGuard } from "./execution-guard.js";
 import type { GitDeliveryRepository } from "../infrastructure/repositories/git-delivery-repository.js";
 import type { ProjectRepository } from "../infrastructure/repositories/project-repository.js";
 import type { WorkflowRepository } from "../infrastructure/repositories/workflow-repository.js";
+import type { WorktreeService } from "./worktree-service.js";
 export class GitDeliveryService {
   constructor(
     private deliveries: GitDeliveryRepository,
     private runs: WorkflowRepository,
     private projects: ProjectRepository,
     private git: GitDeliveryDriver,
+    private worktrees: WorktreeService,
   ) {}
   async review(runId: string) {
     const { worktree } = await this.context(runId);
@@ -47,7 +49,9 @@ export class GitDeliveryService {
       "delivery",
       `Committed and pushed to ${remote}/${worktree.branch}.`,
     );
-    return this.runs.setState(runId, "completed", null);
+    const completed = await this.runs.setState(runId, "completed", null);
+    await this.worktrees.releaseIfActive(worktree.taskId);
+    return completed;
   }
   private async context(runId: string) {
     const run = await this.runs.get(runId);

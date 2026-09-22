@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import {
+  BrowserCredentialInputSchema,
   BrowserTestConfigSchema,
   type BrowserTestConfig,
   type BrowserTestEvidence,
@@ -37,9 +38,8 @@ export class BrowserTestService {
   }
   async saveCredential(projectId: string, key: string, value: string) {
     await this.projects.get(projectId);
-    if (!key.trim() || !value)
-      throw new Error("Credential name and value are required");
-    await this.vault.set(`browser:${projectId}:${key.trim()}`, value);
+    const parsed = BrowserCredentialInputSchema.parse({ key, value });
+    await this.vault.set(`browser:${projectId}:${parsed.key}`, parsed.value);
   }
   async verify(runId: string, projectId: string, worktreePath: string) {
     const config = await this.repository.config(projectId);

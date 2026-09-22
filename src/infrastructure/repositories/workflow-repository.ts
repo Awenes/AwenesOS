@@ -50,19 +50,19 @@ export class WorkflowRepository {
     if (!row) throw new Error(`Workflow run not found: ${id}`);
     return row as WorkflowRun;
   }
-  list() {
-    return this.db
+  async list(): Promise<WorkflowRun[]> {
+    return (await this.db
       .select()
       .from(workflowRuns)
       .where(and(isNull(workflowRuns.archivedAt), isNull(workflowRuns.deletedAt)))
-      .orderBy(asc(workflowRuns.createdAt));
+      .orderBy(asc(workflowRuns.createdAt))) as WorkflowRun[];
   }
-  archived() {
-    return this.db
+  async archived(): Promise<WorkflowRun[]> {
+    return (await this.db
       .select()
       .from(workflowRuns)
       .where(and(isNotNull(workflowRuns.archivedAt), isNull(workflowRuns.deletedAt)))
-      .orderBy(desc(workflowRuns.archivedAt));
+      .orderBy(desc(workflowRuns.archivedAt))) as WorkflowRun[];
   }
   async archive(id: string) {
     const run = await this.get(id);
@@ -90,9 +90,9 @@ export class WorkflowRepository {
       throw new Error("Cancel or finish this run before deleting it");
     if (run.deletedAt) return;
     const now = new Date();
-    await this.event(id, "workflow.deleted", {}, now);
     await this.db.update(workflowRuns).set({ deletedAt: now, archivedAt: null, updatedAt: now }).where(eq(workflowRuns.id, id));
     await this.db.insert(workflowRunTombstones).values({ runId: id, deletedAt: now }).onConflictDoNothing();
+    await this.event(id, "workflow.deleted", {}, now);
   }
   async setState(
     id: string,
@@ -220,12 +220,12 @@ export class WorkflowRepository {
     );
     return value;
   }
-  approvals(runId: string) {
-    return this.db
+  async approvals(runId: string): Promise<Approval[]> {
+    return (await this.db
       .select()
       .from(workflowApprovals)
       .where(eq(workflowApprovals.runId, runId))
-      .orderBy(asc(workflowApprovals.requestedAt));
+      .orderBy(asc(workflowApprovals.requestedAt))) as Approval[];
   }
   async createPlan(runId: string, content: string, requiresApproval = true) {
     await this.get(runId);

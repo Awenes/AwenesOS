@@ -54,4 +54,27 @@ describe("GuardedCommandExecutor", () => {
       }),
     ).rejects.toThrow("outside");
   });
+  it("settles with a timed-out result instead of hanging when a process outlives its timeout", async () => {
+    const root = await mkdtemp(join(tmpdir(), "awenes-exec-"));
+    dirs.push(root);
+    const runner = new GuardedCommandExecutor(root, {
+      networkAccess: "none",
+      autoGrantAgentAccess: false,
+      environmentAllowlist: [],
+      commandAllowlist: ["node"],
+      processTimeoutSeconds: 60,
+      requirePushApproval: true,
+      isolatedBrowserProfile: true,
+    });
+    const started = Date.now();
+    const result = await runner.execute({
+      command: "node",
+      args: ["-e", "setInterval(() => {}, 1000)"],
+      cwd: root,
+      network: "none",
+      timeoutSeconds: 1,
+    });
+    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(result.timedOut).toBe(true);
+  });
 });

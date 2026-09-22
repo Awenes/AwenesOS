@@ -40,8 +40,8 @@ export class ProviderRepository {
 
   async remove(id: string): Promise<void> {
     await this.get(id); const now = new Date();
-    await this.event(id, "provider.removed", {}, now);
     await this.db.update(providerConnections).set({ status: "disconnected", error: null, updatedAt: now }).where(eq(providerConnections.id, id));
+    await this.event(id, "provider.removed", {}, now);
   }
 
   history(providerId: string) { return this.db.select().from(providerEvents).where(eq(providerEvents.providerId, providerId)).orderBy(asc(providerEvents.occurredAt)); }

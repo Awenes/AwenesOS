@@ -12,6 +12,7 @@ export async function openDatabase(path = process.env.AWENES_DB_PATH ?? "./data/
   const absolute = inMemory ? path : resolve(path);
   if (!inMemory) mkdirSync(dirname(absolute), { recursive: true });
   const client = createClient({ url: inMemory ? "file::memory:" : `file:${absolute}` });
+  await client.execute("PRAGMA foreign_keys = ON");
   const migration = await migrateDatabase(client, absolute);
   return { db: drizzle(client, { schema }), client, path: absolute, migration };
 }

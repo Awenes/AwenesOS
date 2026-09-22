@@ -33,6 +33,18 @@ describe("database migrations", () => {
     expect((await readdir(join(directory, "backups"))).length).toBe(1); await opened.client.close();
   });
 
+  it("enforces foreign keys and indexes task_worktrees by project", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "awenes-fk-")); dirs.push(directory); const path = join(directory, "awenes.db");
+    const opened = await openDatabase(path);
+    expect((await opened.client.execute(`PRAGMA foreign_keys`)).rows[0]?.foreign_keys).toBe(1);
+    const indexes = (await opened.client.execute(`SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'task_worktrees'`)).rows.map((row) => row.name);
+    expect(indexes).toContain("task_worktrees_project_idx");
+    await expect(
+      opened.client.execute({ sql: `INSERT INTO task_worktrees (id, task_id, project_id, path, branch, base_branch, status, created_at) VALUES (?,?,?,?,?,?,?,?)`, args: ["w1", "missing-task", "missing-project", "C:\\work", "b", "main", "active", 1] }),
+    ).rejects.toThrow();
+    await opened.client.close();
+  });
+
   it("does not create another backup when no migration is pending", async () => {
     const directory = await mkdtemp(join(tmpdir(), "awenes-current-")); dirs.push(directory); const path = join(directory, "awenes.db");
     const first = await openDatabase(path); await first.client.close(); const second = await openDatabase(path);

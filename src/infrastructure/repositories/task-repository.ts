@@ -152,7 +152,6 @@ export class TaskRepository {
       );
     if (task.deletedAt) return;
     const now = new Date();
-    await this.event(id, "task.deleted", {}, now);
     await this.db
       .update(tasks)
       .set({ deletedAt: now, archivedAt: null, updatedAt: now })
@@ -161,6 +160,7 @@ export class TaskRepository {
       .insert(taskTombstones)
       .values({ taskId: id, deletedAt: now })
       .onConflictDoNothing();
+    await this.event(id, "task.deleted", {}, now);
   }
 
   async findBySourceReference(sourceReference: string): Promise<Task | null> {

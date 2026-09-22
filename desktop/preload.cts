@@ -20,12 +20,17 @@ const successMessages: Record<string, string> = {
   "awenes:prompt:reset": "Prompt reset",
   "awenes:policy:set": "Safety settings saved",
   "awenes:approval:decide": "Decision recorded",
+  "awenes:run:create": "Run created",
   "awenes:run:action": "Workflow updated",
   "awenes:git:review": "Diff review refreshed",
   "awenes:git:commit": "Changes committed",
   "awenes:git:push": "Changes pushed",
   "awenes:browser:config": "Browser validation configured",
+  "awenes:browser:credential": "Credential saved",
   "awenes:browser:run": "Browser validation finished",
+  "awenes:skills:save": "Skill snapshot saved",
+  "awenes:skills:attach": "Skill attached",
+  "awenes:notification:action": "Notification updated",
   "awenes:data:export": "AwenesOS data exported",
 };
 function publishActivity() {

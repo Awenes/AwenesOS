@@ -20,7 +20,24 @@ class ResolvedCliProbe implements ProviderProbe {
   async check() { return { ready: false, detail: "Sign in", resolvedCommand: "C:\\tools\\codex.exe" }; }
 }
 
+class BrokenVault implements SecretVault {
+  async set(): Promise<void> {
+    throw new Error("Encryption is not available on this device");
+  }
+  async get() { return null; }
+  async delete() {}
+}
+
 describe("ProviderService", () => {
+  it("does not leave a stuck provider row when the secret vault fails to store the key", async () => {
+    const opened = await openDatabase(":memory:"); const repository = new ProviderRepository(opened.db); const service = new ProviderService(repository, new BrokenVault(), new FakeProbe());
+    await expect(
+      service.connect({ name: "OpenAI", kind: "openai", authMethod: "api_key", command: null, models: [] }, "key"),
+    ).rejects.toThrow("Could not securely store the credential");
+    expect(await repository.list()).toMatchObject([{ status: "disconnected" }]);
+    opened.client.close();
+  });
+
   it("stores API credentials outside SQLite and records verification events", async () => {
     const opened = await openDatabase(":memory:"); const repository = new ProviderRepository(opened.db); const vault = new MemoryVault(); const probe = new FakeProbe();
     const service = new ProviderService(repository, vault, probe);

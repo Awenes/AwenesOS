@@ -56,7 +56,10 @@ describe("PlaywrightBrowserAutomation", () => {
       expect(evidence.passed).toBe(true);
       expect((await stat(evidence.screenshotPath!)).size).toBeGreaterThan(0);
       expect((await stat(evidence.tracePath!)).size).toBeGreaterThan(0);
-      expect(evidence.consoleErrors).toEqual([]);
+      expect(evidence.consoleErrors).toEqual(["debug value: [redacted]"]);
+      expect(
+        evidence.consoleErrors.some((value) => value.includes("test-secret")),
+      ).toBe(false);
     },
     30_000,
   );

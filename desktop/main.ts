@@ -114,18 +114,19 @@ async function start() {
       new LocalProviderProbe(),
     ),
     instructionService = new InstructionService(instructions, roles),
+    worktreeService = new WorktreeService(
+      projects,
+      tasks,
+      new LocalWorktreeDriver(),
+      new LocalGitRepositoryInitializer(),
+    ),
     workflowService = new WorkflowService(
       runs,
       tasks,
       projects,
       roles,
       instructionService,
-    ),
-    worktreeService = new WorktreeService(
-      projects,
-      tasks,
-      new LocalWorktreeDriver(),
-      new LocalGitRepositoryInitializer(),
+      worktreeService,
     ),
     notificationService = new NotificationService(tasks, runs),
     gitService = new GitDeliveryService(
@@ -133,6 +134,7 @@ async function start() {
       runs,
       projects,
       new LocalGitDeliveryDriver(),
+      worktreeService,
     );
   const runnerFactory = {
     create: (provider: any, worktree: any, policy: any) => {
@@ -154,6 +156,7 @@ async function start() {
     providers,
     worktreeService,
     runnerFactory,
+    gitService,
   );
   const outputRoot = app.isPackaged
     ? join(app.getPath("userData"), "outputs")
@@ -459,7 +462,9 @@ function registerIpc(window: BrowserWindow, s: Services) {
       .object({
         taskId: z.string().uuid(),
         action: z.enum([
+          "confirm",
           "claim",
+          "reject",
           "start",
           "pause",
           "resume",
@@ -620,19 +625,7 @@ function registerIpc(window: BrowserWindow, s: Services) {
     if (value.action === "archive" || value.action === "restore" || value.action === "delete") {
       await s.workflowService[value.action](value.runId);
     } else if (value.action === "next") {
-      const result = await s.workflowEngine.executeNext(value.runId);
-      if (result.status === "running" && result.currentStage === "delivery") {
-        const project = await s.projects.get(result.projectId);
-        const policy = await s.projects.executionPolicy(result.projectId);
-        if (
-          project.completionPolicy === "auto_push" &&
-          !policy.requirePushApproval
-        ) {
-          const { task } = await s.taskService.taskSummary(result.taskId);
-          await s.gitService.commit(result.id, `feat: complete ${task.title}`);
-          await s.gitService.push(result.id);
-        }
-      }
+      await s.workflowEngine.executeNext(value.runId);
     } else {
       const run = await s.workflowService.get(value.runId);
       const task = await s.taskService.taskSummary(run.taskId);

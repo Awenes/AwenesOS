@@ -11,8 +11,15 @@ export class ProviderService {
     const parsed = ProviderConnectionInputSchema.parse(input);
     if (parsed.authMethod === "api_key" && !apiKey?.trim()) throw new Error("An API key is required");
     const connection = await this.repository.create(parsed);
+    if (apiKey) {
+      try {
+        await this.vault.set(secretKey(connection.id), apiKey.trim());
+      } catch (error) {
+        await this.repository.remove(connection.id);
+        throw new Error(`Could not securely store the credential: ${message(error)}`);
+      }
+    }
     try {
-      if (apiKey) await this.vault.set(secretKey(connection.id), apiKey.trim());
       return await this.verify(connection.id);
     } catch (error) {
       await this.repository.recordCheck(connection.id, "error", message(error));

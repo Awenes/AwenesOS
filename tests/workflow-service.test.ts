@@ -4,6 +4,7 @@ import { InstructionService } from "../src/application/instruction-service.js";
 import { ProjectService } from "../src/application/project-service.js";
 import { TaskService } from "../src/application/task-service.js";
 import { WorkflowService } from "../src/application/workflow-service.js";
+import { WorktreeService } from "../src/application/worktree-service.js";
 import { openDatabase } from "../src/infrastructure/db/database.js";
 import { AgentRoleRepository } from "../src/infrastructure/repositories/agent-role-repository.js";
 import { InstructionRepository } from "../src/infrastructure/repositories/instruction-repository.js";
@@ -47,6 +48,10 @@ describe("WorkflowService", () => {
       projects,
       roles,
       new InstructionService(new InstructionRepository(opened.db), roles),
+      new WorktreeService(projects, tasks, {
+        create: async () => {},
+        remove: async () => {},
+      }),
     );
     const created = await service.create(task.id);
     expect(created.run.status).toBe("awaiting_approval");

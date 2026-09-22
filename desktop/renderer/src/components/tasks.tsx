@@ -42,7 +42,15 @@ export function Tasks({
   async function act(
     taskId: string,
     action:
-      "claim" | "start" | "pause" | "resume" | "archive" | "restore" | "delete",
+      | "confirm"
+      | "claim"
+      | "reject"
+      | "start"
+      | "pause"
+      | "resume"
+      | "archive"
+      | "restore"
+      | "delete",
   ) {
     await window.awenes.taskAction({ taskId, action });
     await refresh();
@@ -233,6 +241,22 @@ export function Tasks({
                   </button>
                 )}
               {task.status === "captured" && (
+                <button
+                  className="small-button"
+                  onClick={() => void act(task.id, "confirm")}
+                >
+                  Confirm
+                </button>
+              )}
+              {task.status === "captured" && (
+                <button
+                  className="small-button"
+                  onClick={() => void act(task.id, "reject")}
+                >
+                  Reject
+                </button>
+              )}
+              {(task.status === "captured" || task.status === "assigned") && (
                 <button
                   className="small-button"
                   onClick={() => void act(task.id, "claim")}

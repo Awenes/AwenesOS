@@ -30,4 +30,14 @@ export class WorktreeService {
     const worktree = await this.projects.worktreeForTask(taskId); if (!worktree || worktree.status !== "active") throw new Error(`No active worktree for task ${taskId}`);
     const project = await this.projects.get(worktree.projectId); await this.git.remove(project.repositoryRoot, worktree.path); return this.projects.releaseWorktree(taskId);
   }
+
+  async releaseIfActive(taskId: string) {
+    const worktree = await this.projects.worktreeForTask(taskId);
+    if (worktree?.status !== "active") return;
+    // Best-effort: the delivery this follows already succeeded, so a worktree
+    // that isn't clean yet (e.g. untracked build output) must not fail it.
+    try {
+      await this.release(taskId);
+    } catch {}
+  }
 }

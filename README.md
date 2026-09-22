@@ -139,7 +139,7 @@ When automatic runtime access is disabled, provider traffic requires a manual pu
 
 ## Quality gates
 
-Before handoff, run `pnpm check`, `pnpm test`, `pnpm build`, and `pnpm test:desktop-smoke`. If the local pnpm launcher cannot run, the equivalent `npm run` scripts use the installed dependencies. Physical Windows QA remains mandatory before the Tauri migration.
+Before handoff, run `pnpm check`, `pnpm test`, and `pnpm build`; CI enforces these three on every push. `pnpm test:desktop-smoke` launches the real Electron app and is a useful local check, but it needs a display and is not run in CI. If the local pnpm launcher cannot run, the equivalent `npm run` scripts use the installed dependencies. Physical Windows QA remains mandatory before the Tauri migration.
 
 ## Documentation
 

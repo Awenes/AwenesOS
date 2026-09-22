@@ -1,4 +1,5 @@
 import type { InstructionService } from "./instruction-service.js";
+import type { WorktreeService } from "./worktree-service.js";
 import type { AgentRoleRepository } from "../infrastructure/repositories/agent-role-repository.js";
 import type { ProjectRepository } from "../infrastructure/repositories/project-repository.js";
 import type { TaskRepository } from "../infrastructure/repositories/task-repository.js";
@@ -26,6 +27,7 @@ export class WorkflowService {
     private projects: ProjectRepository,
     private roles: AgentRoleRepository,
     private instructions: InstructionService,
+    private worktrees: WorktreeService,
   ) {}
   list() {
     return this.runs.list();
@@ -138,7 +140,13 @@ export class WorkflowService {
         "delivery",
         "Delivery reviewed and completed manually by the developer.",
       );
-      return this.runs.setState(decision.run.id, "completed", null);
+      const completed = await this.runs.setState(
+        decision.run.id,
+        "completed",
+        null,
+      );
+      await this.worktrees.releaseIfActive(decision.run.taskId);
+      return completed;
     }
     const stage =
       decision.approval.kind === "start" ? "plan" : decision.run.currentStage;

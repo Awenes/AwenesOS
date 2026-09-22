@@ -1,8 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, or } from "drizzle-orm";
-import type { AgentRole, AgentRoleInput } from "../../domain/agent-role.js";
+import { z } from "zod";
+import {
+  AgentCapabilitySchema,
+  RoleLimitsSchema,
+  type AgentRole,
+  type AgentRoleInput,
+} from "../../domain/agent-role.js";
 import type { Database } from "../db/database.js";
 import { agentRoleEvents, agentRoles } from "../db/schema.js";
+const AssignModelInputSchema = z.object({
+  providerId: z.string().trim().min(1).max(80),
+  modelId: z.string().trim().min(1).max(120),
+});
 
 export class AgentRoleRepository {
   constructor(private readonly db: Database) {}
@@ -23,8 +33,8 @@ export class AgentRoleRepository {
     return (await this.db.select().from(agentRoles).where(where).orderBy(asc(agentRoles.scopeKey), asc(agentRoles.name))).map(fromRow);
   }
   async assignModel(id: string, providerId: string, modelId: string): Promise<AgentRole> {
-    if (!providerId || !modelId) throw new Error("Provider and model are required"); const now = new Date();
-    await this.db.update(agentRoles).set({ providerId, modelId, updatedAt: now }).where(eq(agentRoles.id, id)); await this.event(id, "agent_role.model_assigned", { providerId, modelId }, now); return this.get(id);
+    const parsed = AssignModelInputSchema.parse({ providerId, modelId }); const now = new Date();
+    await this.db.update(agentRoles).set({ providerId: parsed.providerId, modelId: parsed.modelId, updatedAt: now }).where(eq(agentRoles.id, id)); await this.event(id, "agent_role.model_assigned", { providerId: parsed.providerId, modelId: parsed.modelId }, now); return this.get(id);
   }
   async setEnabled(id: string, enabled: boolean): Promise<AgentRole> {
     await this.get(id); const now = new Date(); await this.db.update(agentRoles).set({ enabled, updatedAt: now }).where(eq(agentRoles.id, id)); await this.event(id, enabled ? "agent_role.enabled" : "agent_role.disabled", {}, now); return this.get(id);
@@ -36,5 +46,9 @@ export class AgentRoleRepository {
 
 function fromRow(row: typeof agentRoles.$inferSelect): AgentRole {
   const { scopeKey: _scopeKey, capabilities, limits, ...rest } = row;
-  return { ...rest, capabilities: capabilities as AgentRole["capabilities"], limits: limits as AgentRole["limits"] };
+  return {
+    ...rest,
+    capabilities: z.array(AgentCapabilitySchema).min(1).parse(capabilities),
+    limits: RoleLimitsSchema.parse(limits),
+  };
 }

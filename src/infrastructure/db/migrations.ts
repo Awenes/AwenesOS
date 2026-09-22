@@ -138,6 +138,12 @@ export const databaseMigrations: DatabaseMigration[] = [{
          completed_at = COALESCE(completed_at, CAST(strftime('%s','now') AS INTEGER) * 1000)
      WHERE stage = 'delivery' AND status <> 'passed' AND run_id IN (SELECT id FROM workflow_runs WHERE status = 'completed')`
   ]
+}, {
+  version: 14,
+  name: "task_worktrees_project_index",
+  statements: [
+    `CREATE INDEX IF NOT EXISTS task_worktrees_project_idx ON task_worktrees(project_id)`
+  ]
 }];
 
 export const currentDatabaseVersion = databaseMigrations.at(-1)?.version ?? 0;

@@ -9,8 +9,8 @@ Follow `docs/coding-standards.md` for layering, component design, naming, and va
 - Keep domain and application code independent of Commander, SQLite, and any specific CRM.
 - Validate boundary inputs with Zod.
 - Record state changes as events; never silently repair history.
-- Do not mark a task completed until its external system confirms completion.
-- Treat tracker issues as candidates until explicitly claimed.
+- Do not mark a task completed without recorded evidence of the work (git delivery, captured evidence, or explicit manual confirmation); v0.1 has no external system to confirm completion (see `.ai/decisions/0003-retire-crm-and-tracker-integrations.md`).
+- Treat captured tasks as candidates until explicitly claimed.
 - Add or update tests for behavior changes.
 - Do not add a web dashboard, Docker, telemetry, or paid AI dependency in v0.1.
 
