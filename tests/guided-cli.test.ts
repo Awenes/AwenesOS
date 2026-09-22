@@ -25,7 +25,7 @@ describe("guided CLI", () => {
     const dir = await mkdtemp(join(tmpdir(), "awenes-guided-")); dirs.push(dir);
     const opened = await openDatabase(":memory:");
     const service = new TaskService(new TaskRepository(opened.db));
-    const io = new ScriptedIO(["1", "Fix enrollment validation", "5", "Handle invalid student records", "", "yes", "7"]);
+    const io = new ScriptedIO(["1", "Fix enrollment validation", "5", "Handle invalid student records", "", "yes", "6"]);
     await new GuidedCli(service, io).run();
     const inbox = await service.inbox();
     expect(inbox).toHaveLength(1);

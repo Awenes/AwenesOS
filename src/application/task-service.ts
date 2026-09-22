@@ -1,18 +1,12 @@
 import {
   assertTransition,
   CaptureTaskSchema,
-  EvidenceKindSchema,
   type CaptureTask,
   type Task,
   type TaskStatus,
 } from "../domain/task.js";
 import { TaskRepository } from "../infrastructure/repositories/task-repository.js";
-import type {
-  GitEvidenceCollector,
-  GitRepositoryInspector,
-} from "../domain/git-evidence.js";
 import { draftCompletionDescription } from "./completion-draft.js";
-import { ReportingService } from "./reporting-service.js";
 import {
   calculateTaskDuration,
   formatDuration,
@@ -100,86 +94,6 @@ export class TaskService {
     return this.syncExecution(id, "in_progress", "task.resumed");
   }
 
-  async addEvidence(id: string, kind: string, value: string) {
-    await this.repository.get(id);
-    await this.repository.addEvidence(
-      id,
-      EvidenceKindSchema.parse(kind),
-      value.trim(),
-    );
-  }
-
-  async attachRepository(
-    id: string,
-    repositoryPath: string,
-    inspector: GitRepositoryInspector,
-  ) {
-    const task = await this.repository.get(id);
-    if (!["planned", "in_progress", "paused"].includes(task.status))
-      throw new Error(
-        `A repository can only be attached to planned or active work; task is ${task.status}`,
-      );
-    const identity = await inspector.inspect(repositoryPath);
-    return this.repository.saveRepositoryMapping({
-      taskId: id,
-      repositoryRoot: identity.repository,
-      branchAtMapping: identity.branch,
-      headAtMapping: identity.head,
-    });
-  }
-
-  repositoryMapping(id: string) {
-    return this.repository.repositoryMapping(id);
-  }
-
-  async collectGitEvidence(
-    id: string,
-    repositoryPath: string | undefined,
-    collector: GitEvidenceCollector,
-  ) {
-    const task = await this.repository.get(id);
-    if (task.status !== "in_progress" && task.status !== "paused")
-      throw new Error(
-        `Git evidence can only be collected for active or paused work; task is ${task.status}`,
-      );
-    const history = await this.repository.history(id);
-    const started = history.find((event) => event.type === "task.started");
-    if (!started) throw new Error("Task has no recorded start time");
-    const mapped = await this.repository.repositoryMapping(id);
-    const selectedRepository = repositoryPath?.trim() || mapped?.repositoryRoot;
-    if (!selectedRepository)
-      throw new Error("No Git repository is attached to this task");
-    const collected = await collector.collect({
-      repositoryPath: selectedRepository,
-      since: started.occurredAt,
-    });
-    let added = 0;
-    let skippedExisting = 0;
-    const items = [
-      ...collected.commits.map((value) => ({ kind: "commit" as const, value })),
-      ...collected.files.map((value) => ({
-        kind: "file" as const,
-        value: `${collected.repository}: ${value}`,
-      })),
-    ];
-    for (const item of items) {
-      if (await this.repository.hasEvidence(id, item.kind, item.value)) {
-        skippedExisting += 1;
-        continue;
-      }
-      await this.repository.addEvidence(id, item.kind, item.value);
-      added += 1;
-    }
-    return {
-      repository: collected.repository,
-      branch: collected.branch,
-      commits: collected.commits.length,
-      files: collected.files.length,
-      added,
-      skippedExisting,
-    };
-  }
-
   async prepareCompletion(id: string, note?: string): Promise<string> {
     const task = await this.repository.get(id);
     if (task.status !== "in_progress" && task.status !== "paused")
@@ -246,10 +160,6 @@ export class TaskService {
       evidence: await this.repository.evidenceFor(id),
       repository: await this.repository.repositoryMapping(id),
     };
-  }
-
-  async standup(now = new Date()): Promise<string> {
-    return new ReportingService(this.repository).standup(now);
   }
 
   private async move(id: string, to: TaskStatus, event: string) {

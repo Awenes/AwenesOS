@@ -1,8 +1,7 @@
 import { createInterface, type Interface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import type { TaskService } from "../application/task-service.js";
-import { evidenceKinds, taskSources, type Task } from "../domain/task.js";
-import { LocalGitEvidenceCollector } from "../infrastructure/evidence/git-evidence-collector.js";
+import { taskSources, type Task } from "../domain/task.js";
 import type { NotificationService } from "../application/notification-service.js";
 export interface GuidedIO { ask(question: string): Promise<string>; write(message: string): void; close(): void; }
 export class ReadlineGuidedIO implements GuidedIO {
@@ -18,14 +17,13 @@ export class GuidedCli {
     let running = true;
     while (running) {
       try {
-        const action = await this.choose("What do you want to do?", ["Capture a task", "Review assignment inbox", "Manage active work", "Review notifications", "Generate next standup", "View task history", "Exit"]);
+        const action = await this.choose("What do you want to do?", ["Capture a task", "Review assignment inbox", "Manage active work", "Review notifications", "View task history", "Exit"]);
         if (action === 0) await this.capture();
         if (action === 1) await this.reviewInbox();
         if (action === 2) await this.manageWork();
         if (action === 3) await this.reviewNotifications();
-        if (action === 4) this.io.write(`\n${await this.service.standup()}\n`);
-        if (action === 5) await this.showHistory();
-        if (action === 6) running = false;
+        if (action === 4) await this.showHistory();
+        if (action === 5) running = false;
       } catch (error) { this.io.write(`\nCould not complete that action: ${messageOf(error)}\n`); }
     }
     this.io.write("Session closed. Your local data is saved.");
@@ -53,12 +51,9 @@ export class GuidedCli {
     if (!task) return;
     const actions = actionsFor(task);
     const action = actions[await this.choose(`“${task.title}” is ${task.status}.`, actions)];
-    if (action === "Attach or change Git repository") await this.attachRepository(task);
     if (action === "Start work") { await this.service.start(task.id); this.io.write("Work started.\n"); }
     if (action === "Pause work") { await this.service.pause(task.id); this.io.write("Work paused.\n"); }
     if (action === "Resume work") { await this.service.resume(task.id); this.io.write("Work resumed.\n"); }
-    if (action === "Add completion evidence") await this.addEvidence(task);
-    if (action === "Collect Git evidence") await this.collectGitEvidence(task);
     if (action === "Prepare completion") await this.prepareCompletion(task);
     if (action === "Edit completion description") await this.editCompletion(task);
     if (action === "Complete task") { await this.service.complete(task.id); this.io.write("Task completed locally.\n"); }
@@ -73,20 +68,6 @@ export class GuidedCli {
     if (action === 1) { await this.notifications.dismiss(selected.key); this.io.write("Notification dismissed.\n"); }
   }
 
-  private async addEvidence(task: Task) {
-    const kind = evidenceKinds[await this.choose("Evidence type", [...evidenceKinds])]!;
-    await this.service.addEvidence(task.id, kind, await this.required("Evidence details: "));
-    this.io.write("Evidence recorded.\n");
-  }
-  private async attachRepository(task: Task) {
-    const repository = (await this.io.ask("Git repository path (leave blank for current directory): ")).trim() || ".";
-    const mapping = await this.service.attachRepository(task.id, repository, new LocalGitEvidenceCollector());
-    this.io.write(`Attached ${mapping.repositoryRoot} on ${mapping.branchAtMapping}.\n`);
-  }
-  private async collectGitEvidence(task: Task) {
-    const result = await this.service.collectGitEvidence(task.id, undefined, new LocalGitEvidenceCollector());
-    this.io.write(`Collected ${result.added} evidence item(s) from ${result.branch}; ${result.skippedExisting} already recorded.\n`);
-  }
   private async prepareCompletion(task: Task) {
     const note = await this.io.ask("Completion summary (leave blank to draft from evidence): ");
     const description = await this.service.prepareCompletion(task.id, note.trim() || undefined);
@@ -132,9 +113,9 @@ export class GuidedCli {
 }
 
 function actionsFor(task: Task): string[] {
-  if (task.status === "planned") return ["Attach or change Git repository", "Start work", "Back"];
-  if (task.status === "in_progress") return ["Pause work", "Attach or change Git repository", "Add completion evidence", "Collect Git evidence", "Prepare completion", "Back"];
-  if (task.status === "paused") return ["Resume work", "Attach or change Git repository", "Add completion evidence", "Collect Git evidence", "Prepare completion", "Back"];
+  if (task.status === "planned") return ["Start work", "Back"];
+  if (task.status === "in_progress") return ["Pause work", "Prepare completion", "Back"];
+  if (task.status === "paused") return ["Resume work", "Prepare completion", "Back"];
   if (task.status === "ready_to_complete") return ["Edit completion description", "Complete task", "Back"];
   if (task.status === "sync_pending") return ["Edit completion description", "Back"];
   return ["Back"];

@@ -14,8 +14,7 @@ describe("local task service", () => {
       await service.start(task.id);
       await service.pause(task.id);
       await service.resume(task.id);
-      await service.addEvidence(task.id, "test", "Onboarding checks passed");
-      expect(await service.draftCompletion(task.id)).toContain("Onboarding checks passed");
+      await service.draftCompletion(task.id);
       await service.prepareCompletion(task.id, "Implemented and checked the form");
       expect((await service.complete(task.id)).status).toBe("completed");
       expect((await service.history(task.id)).at(-1)?.type).toBe("task.completed");

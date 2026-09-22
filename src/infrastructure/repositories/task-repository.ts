@@ -12,7 +12,6 @@ import {
 import { randomUUID } from "node:crypto";
 import type {
   CaptureTask,
-  EvidenceKind,
   Task,
   TaskStatus,
 } from "../../domain/task.js";
@@ -233,17 +232,6 @@ export class TaskRepository {
     return this.get(id);
   }
 
-  async addEvidence(
-    taskId: string,
-    kind: EvidenceKind,
-    value: string,
-  ): Promise<void> {
-    await this.db
-      .insert(evidence)
-      .values({ id: randomUUID(), taskId, kind, value, createdAt: new Date() });
-    await this.event(taskId, "task.evidence_added", { kind, value });
-  }
-
   async evidenceFor(taskId: string) {
     return this.db
       .select()
@@ -251,62 +239,12 @@ export class TaskRepository {
       .where(eq(evidence.taskId, taskId))
       .orderBy(asc(evidence.createdAt));
   }
-  async hasEvidence(
-    taskId: string,
-    kind: EvidenceKind,
-    value: string,
-  ): Promise<boolean> {
-    return Boolean(
-      await this.db.query.evidence.findFirst({
-        where: and(
-          eq(evidence.taskId, taskId),
-          eq(evidence.kind, kind),
-          eq(evidence.value, value),
-        ),
-      }),
-    );
-  }
   async history(taskId: string) {
     return this.db
       .select()
       .from(taskEvents)
       .where(eq(taskEvents.taskId, taskId))
       .orderBy(asc(taskEvents.occurredAt));
-  }
-
-  async saveRepositoryMapping(
-    mapping: Omit<TaskRepositoryMapping, "createdAt" | "updatedAt">,
-  ): Promise<TaskRepositoryMapping> {
-    const now = new Date();
-    const existing = await this.repositoryMapping(mapping.taskId);
-    await this.db
-      .insert(taskRepositories)
-      .values({
-        id: randomUUID(),
-        ...mapping,
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: taskRepositories.taskId,
-        set: {
-          repositoryRoot: mapping.repositoryRoot,
-          branchAtMapping: mapping.branchAtMapping,
-          headAtMapping: mapping.headAtMapping,
-          updatedAt: now,
-        },
-      });
-    await this.event(
-      mapping.taskId,
-      existing ? "task.repository_remapped" : "task.repository_mapped",
-      {
-        repositoryRoot: mapping.repositoryRoot,
-        branchAtMapping: mapping.branchAtMapping,
-        headAtMapping: mapping.headAtMapping,
-      },
-      now,
-    );
-    return (await this.repositoryMapping(mapping.taskId))!;
   }
 
   async repositoryMapping(
