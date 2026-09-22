@@ -107,7 +107,7 @@ async function start() {
       new LocalEnvironmentInspector(),
       new LocalGitRepositoryInitializer(),
     ),
-    roleService = new AgentRoleService(roles, projects),
+    roleService = new AgentRoleService(roles, projects, providers),
     providerService = new ProviderService(
       providers,
       vault,
@@ -228,9 +228,9 @@ async function start() {
       void runAutomatically(run.id, desktopServices);
   }
   startNotificationPump(notificationService);
-  const capturePath = process.argv
-    .find((value) => value.startsWith("capture="))
-    ?.slice(8);
+  const capturePath = !app.isPackaged
+    ? process.argv.find((value) => value.startsWith("capture="))?.slice(8)
+    : undefined;
   if (capturePath) {
     mainWindow.webContents.debugger.attach("1.3");
     const result = (await mainWindow.webContents.debugger.sendCommand(

@@ -10,7 +10,9 @@ export async function migrateDatabase(client: Client, databasePath: string): Pro
   const appliedRows = hasLedger ? (await client.execute(`SELECT version FROM _awenes_migrations ORDER BY version`)).rows : [];
   const appliedVersions = new Set(appliedRows.map((row) => Number(row.version)));
   const fromVersion = appliedVersions.size ? Math.max(...appliedVersions) : 0;
-  const pending = databaseMigrations.filter((migration) => !appliedVersions.has(migration.version));
+  const pending = databaseMigrations
+    .filter((migration) => !appliedVersions.has(migration.version))
+    .sort((a, b) => a.version - b.version);
   const existingUserTables = (await client.execute(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name <> '_awenes_migrations'`)).rows.length;
   let backupPath: string | null = null;
   if (pending.length && existingUserTables > 0 && databasePath !== ":memory:" && await exists(databasePath)) backupPath = await createDatabaseBackup(client, databasePath);

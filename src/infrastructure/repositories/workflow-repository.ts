@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import type {
   Approval,
   ApprovalKind,
@@ -21,6 +21,10 @@ import {
   workflowSteps,
 } from "../db/schema.js";
 
+// Safety valve so a long-running local install can't hand the renderer/CLI an
+// unbounded result set.
+const MAX_LIST_ROWS = 2_000;
+
 export class WorkflowRepository {
   constructor(private readonly db: Database) {}
   async create(taskId: string, projectId: string) {
@@ -39,8 +43,12 @@ export class WorkflowRepository {
       archivedAt: null,
       deletedAt: null,
     };
-    await this.db.insert(workflowRuns).values(run);
-    await this.event(run.id, "workflow.created", {}, now);
+    await this.db.batch([
+      this.db.insert(workflowRuns).values(run),
+      this.db
+        .insert(workflowEvents)
+        .values({ id: randomUUID(), runId: run.id, type: "workflow.created", data: {}, occurredAt: now }),
+    ]);
     return run;
   }
   async get(id: string) {
@@ -55,14 +63,16 @@ export class WorkflowRepository {
       .select()
       .from(workflowRuns)
       .where(and(isNull(workflowRuns.archivedAt), isNull(workflowRuns.deletedAt)))
-      .orderBy(asc(workflowRuns.createdAt))) as WorkflowRun[];
+      .orderBy(asc(workflowRuns.createdAt))
+      .limit(MAX_LIST_ROWS)) as WorkflowRun[];
   }
   async archived(): Promise<WorkflowRun[]> {
     return (await this.db
       .select()
       .from(workflowRuns)
       .where(and(isNotNull(workflowRuns.archivedAt), isNull(workflowRuns.deletedAt)))
-      .orderBy(desc(workflowRuns.archivedAt))) as WorkflowRun[];
+      .orderBy(desc(workflowRuns.archivedAt))
+      .limit(MAX_LIST_ROWS)) as WorkflowRun[];
   }
   async archive(id: string) {
     const run = await this.get(id);
@@ -90,9 +100,13 @@ export class WorkflowRepository {
       throw new Error("Cancel or finish this run before deleting it");
     if (run.deletedAt) return;
     const now = new Date();
-    await this.db.update(workflowRuns).set({ deletedAt: now, archivedAt: null, updatedAt: now }).where(eq(workflowRuns.id, id));
-    await this.db.insert(workflowRunTombstones).values({ runId: id, deletedAt: now }).onConflictDoNothing();
-    await this.event(id, "workflow.deleted", {}, now);
+    await this.db.batch([
+      this.db.update(workflowRuns).set({ deletedAt: now, archivedAt: null, updatedAt: now }).where(eq(workflowRuns.id, id)),
+      this.db.insert(workflowRunTombstones).values({ runId: id, deletedAt: now }).onConflictDoNothing(),
+      this.db
+        .insert(workflowEvents)
+        .values({ id: randomUUID(), runId: id, type: "workflow.deleted", data: {}, occurredAt: now }),
+    ]);
   }
   async setState(
     id: string,
@@ -102,18 +116,22 @@ export class WorkflowRepository {
   ) {
     const current = await this.get(id);
     const now = new Date();
-    await this.db
-      .update(workflowRuns)
-      .set({
-        status,
-        currentStage: stage,
-        error,
-        updatedAt: now,
-        startedAt: status === "running" && !current.startedAt ? now : undefined,
-        completedAt: status === "completed" ? now : undefined,
-      })
-      .where(eq(workflowRuns.id, id));
-    await this.event(id, `workflow.${status}`, { stage, error }, now);
+    await this.db.batch([
+      this.db
+        .update(workflowRuns)
+        .set({
+          status,
+          currentStage: stage,
+          error,
+          updatedAt: now,
+          startedAt: status === "running" && !current.startedAt ? now : undefined,
+          completedAt: status === "completed" ? now : undefined,
+        })
+        .where(eq(workflowRuns.id, id)),
+      this.db
+        .insert(workflowEvents)
+        .values({ id: randomUUID(), runId: id, type: `workflow.${status}`, data: { stage, error }, occurredAt: now }),
+    ]);
     return this.get(id);
   }
   async addStep(
@@ -347,46 +365,51 @@ export class WorkflowRepository {
       .select()
       .from(workflowRuns)
       .where(eq(workflowRuns.status, "running"));
-    const now = new Date();
-    let recovered = 0;
-    for (const run of interrupted) {
-      const activeStep = await this.db.query.workflowSteps.findFirst({
-        where: and(
-          eq(workflowSteps.runId, run.id),
+    if (!interrupted.length) return 0;
+    const interruptedIds = interrupted.map((run) => run.id);
+    const activeSteps = await this.db
+      .select()
+      .from(workflowSteps)
+      .where(
+        and(
+          inArray(workflowSteps.runId, interruptedIds),
           eq(workflowSteps.status, "running"),
         ),
-      });
-      if (!activeStep) continue;
-      await this.db
-        .update(workflowSteps)
-        .set({
-          status: "failed",
-          output: "Awenes stopped before this step finished.",
-          completedAt: now,
-        })
-        .where(
-          and(
-            eq(workflowSteps.runId, run.id),
-            eq(workflowSteps.status, "running"),
-          ),
-        );
-      await this.db
-        .update(workflowRuns)
-        .set({
-          status: "paused",
-          error: "Recovered after an interrupted application session",
-          updatedAt: now,
-        })
-        .where(eq(workflowRuns.id, run.id));
-      await this.event(
-        run.id,
-        "workflow.recovered",
-        { previousStatus: "running" },
-        now,
       );
-      recovered += 1;
-    }
-    return recovered;
+    if (!activeSteps.length) return 0;
+    const runIdsToRecover = [...new Set(activeSteps.map((step) => step.runId))];
+    const now = new Date();
+    await this.db
+      .update(workflowSteps)
+      .set({
+        status: "failed",
+        output: "Awenes stopped before this step finished.",
+        completedAt: now,
+      })
+      .where(
+        and(
+          inArray(workflowSteps.runId, runIdsToRecover),
+          eq(workflowSteps.status, "running"),
+        ),
+      );
+    await this.db
+      .update(workflowRuns)
+      .set({
+        status: "paused",
+        error: "Recovered after an interrupted application session",
+        updatedAt: now,
+      })
+      .where(inArray(workflowRuns.id, runIdsToRecover));
+    await this.db.insert(workflowEvents).values(
+      runIdsToRecover.map((runId) => ({
+        id: randomUUID(),
+        runId,
+        type: "workflow.recovered",
+        data: { previousStatus: "running" },
+        occurredAt: now,
+      })),
+    );
+    return runIdsToRecover.length;
   }
   private event(
     runId: string,

@@ -171,7 +171,9 @@ function item(
   suggestedAction: string,
 ): LocalNotification {
   return {
-    key: `${kind}:${task.id}:${task.updatedAt.getTime()}`,
+    // Stable per (kind, task): keying on updatedAt would un-dismiss the
+    // notification on any incidental task edit, not just a real state change.
+    key: `${kind}:${task.id}`,
     taskId: task.id,
     kind,
     severity,

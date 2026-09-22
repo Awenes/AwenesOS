@@ -26,6 +26,10 @@ import {
   taskTombstones,
 } from "../db/schema.js";
 
+// Safety valve so a long-running local install can't hand the renderer/CLI an
+// unbounded result set; ordering keeps the most recently touched rows.
+const MAX_LIST_ROWS = 2_000;
+
 export interface TaskRepositoryMapping {
   taskId: string;
   repositoryRoot: string;
@@ -58,13 +62,16 @@ export class TaskRepository {
       archivedAt: null,
       deletedAt: null,
     };
-    await this.db.insert(tasks).values(task);
-    await this.event(
-      task.id,
-      "task.captured",
-      { source: task.source, assignedToMe: task.assignedToMe },
-      now,
-    );
+    await this.db.batch([
+      this.db.insert(tasks).values(task),
+      this.db.insert(taskEvents).values({
+        id: randomUUID(),
+        taskId: task.id,
+        type: "task.captured",
+        data: { source: task.source, assignedToMe: task.assignedToMe },
+        occurredAt: now,
+      }),
+    ]);
     return task;
   }
 
@@ -87,7 +94,8 @@ export class TaskRepository {
           statuses?.length ? inArray(tasks.status, statuses) : undefined,
         ),
       )
-      .orderBy(desc(tasks.updatedAt));
+      .orderBy(desc(tasks.updatedAt))
+      .limit(MAX_LIST_ROWS);
     return rows as Task[];
   }
 
@@ -102,7 +110,8 @@ export class TaskRepository {
           isNull(tasks.deletedAt),
         ),
       )
-      .orderBy(desc(tasks.updatedAt))) as Task[];
+      .orderBy(desc(tasks.updatedAt))
+      .limit(MAX_LIST_ROWS)) as Task[];
   }
 
   async archived(): Promise<Task[]> {
@@ -110,7 +119,8 @@ export class TaskRepository {
       .select()
       .from(tasks)
       .where(and(isNull(tasks.deletedAt), isNotNull(tasks.archivedAt)))
-      .orderBy(desc(tasks.archivedAt))) as Task[];
+      .orderBy(desc(tasks.archivedAt))
+      .limit(MAX_LIST_ROWS)) as Task[];
   }
 
   async archive(id: string): Promise<Task> {
@@ -151,15 +161,19 @@ export class TaskRepository {
       );
     if (task.deletedAt) return;
     const now = new Date();
-    await this.db
-      .update(tasks)
-      .set({ deletedAt: now, archivedAt: null, updatedAt: now })
-      .where(eq(tasks.id, id));
-    await this.db
-      .insert(taskTombstones)
-      .values({ taskId: id, deletedAt: now })
-      .onConflictDoNothing();
-    await this.event(id, "task.deleted", {}, now);
+    await this.db.batch([
+      this.db
+        .update(tasks)
+        .set({ deletedAt: now, archivedAt: null, updatedAt: now })
+        .where(eq(tasks.id, id)),
+      this.db
+        .insert(taskTombstones)
+        .values({ taskId: id, deletedAt: now })
+        .onConflictDoNothing(),
+      this.db
+        .insert(taskEvents)
+        .values({ id: randomUUID(), taskId: id, type: "task.deleted", data: {}, occurredAt: now }),
+    ]);
   }
 
   async findBySourceReference(sourceReference: string): Promise<Task | null> {
@@ -219,16 +233,20 @@ export class TaskRepository {
     now = new Date(),
     eventType = "task.completed",
   ): Promise<Task> {
-    await this.db
-      .update(tasks)
-      .set({
-        status: "completed",
-        completedAt: now,
-        updatedAt: now,
-        syncError: null,
-      })
-      .where(eq(tasks.id, id));
-    await this.event(id, eventType, {}, now);
+    await this.db.batch([
+      this.db
+        .update(tasks)
+        .set({
+          status: "completed",
+          completedAt: now,
+          updatedAt: now,
+          syncError: null,
+        })
+        .where(eq(tasks.id, id)),
+      this.db
+        .insert(taskEvents)
+        .values({ id: randomUUID(), taskId: id, type: eventType, data: {}, occurredAt: now }),
+    ]);
     return this.get(id);
   }
 

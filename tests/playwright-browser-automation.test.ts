@@ -54,7 +54,9 @@ describe("PlaywrightBrowserAutomation", () => {
         commands,
       });
       expect(evidence.passed).toBe(true);
-      expect((await stat(evidence.screenshotPath!)).size).toBeGreaterThan(0);
+      // A credential was typed into the page during this run, so no screenshot
+      // is captured — only the trace (recorded without pixel snapshots) is.
+      expect(evidence.screenshotPath).toBeNull();
       expect((await stat(evidence.tracePath!)).size).toBeGreaterThan(0);
       expect(evidence.consoleErrors).toEqual(["debug value: [redacted]"]);
       expect(

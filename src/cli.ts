@@ -20,6 +20,7 @@ import { LocalGitRepositoryInitializer } from "./infrastructure/git/local-git-re
 import { AgentRoleService } from "./application/agent-role-service.js";
 import { AgentRoleInputSchema } from "./domain/agent-role.js";
 import { AgentRoleRepository } from "./infrastructure/repositories/agent-role-repository.js";
+import { ProviderRepository } from "./infrastructure/repositories/provider-repository.js";
 
 const { db, client, path: databasePath, migration } = await openDatabase();
 const repository = new TaskRepository(db);
@@ -29,7 +30,8 @@ const projectRepository = new ProjectRepository(db);
 const projectService = new ProjectService(projectRepository, new LocalEnvironmentInspector());
 const worktrees = new WorktreeService(projectRepository, repository, new LocalWorktreeDriver(), new LocalGitRepositoryInitializer());
 const roleRepository = new AgentRoleRepository(db);
-const roles = new AgentRoleService(roleRepository, projectRepository);
+const providerRepository = new ProviderRepository(db);
+const roles = new AgentRoleService(roleRepository, projectRepository, providerRepository);
 await roles.initializeBuiltIns();
 const cli = new Command().name("awenes").description("Awenes OS local-first work engine").version("0.1.0");
 

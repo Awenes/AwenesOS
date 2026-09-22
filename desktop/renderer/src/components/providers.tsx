@@ -16,13 +16,13 @@ export function Providers({
   const [kind, setKind] = useState<"openai" | "anthropic">("openai");
   const [authMethod, setAuthMethod] = useState<"api_key" | "cli">("api_key");
   const [models, setModels] = useState<string[]>([
-    PROVIDER_MODELS.openai[0].id,
+    PROVIDER_MODELS.openai[0]!.id,
   ]);
   const [verifyingProvider, setVerifyingProvider] = useState<string | null>(
     null,
   );
   const providerPage = usePagination(data.providers);
-  useEffect(() => setModels([PROVIDER_MODELS[kind][0].id]), [kind]);
+  useEffect(() => setModels([PROVIDER_MODELS[kind][0]!.id]), [kind]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -32,7 +32,7 @@ export function Providers({
       authMethod,
       command: authMethod === "cli" ? String(form.get("command")) : null,
       models,
-      apiKey: authMethod === "api_key" ? String(form.get("key")) : undefined,
+      ...(authMethod === "api_key" ? { apiKey: String(form.get("key")) } : {}),
     });
     setShow(false);
     await refresh();

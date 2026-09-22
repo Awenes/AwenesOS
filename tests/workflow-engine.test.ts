@@ -316,7 +316,7 @@ describe("WorkflowEngine", () => {
     expect(approvals.at(-1)).toMatchObject({ kind: "stage", status: "pending" });
     opened.client.close();
   });
-  it("grants provider runtime access automatically without disabling push approval", async () => {
+  it("grants provider runtime access automatically for the run only, without persisting it to the project's saved policy", async () => {
     const opened = await openDatabase(":memory:");
     const tasks = new TaskRepository(opened.db),
       projects = new ProjectRepository(opened.db),
@@ -366,6 +366,7 @@ describe("WorkflowEngine", () => {
       content: "Snapshot",
     });
     await runs.setState(run.id, "running", "implement");
+    let grantedPolicy: unknown;
     const engine = new WorkflowEngine(
       runs,
       tasks,
@@ -386,21 +387,31 @@ describe("WorkflowEngine", () => {
         }),
       } as any,
       {
-        create: () => ({
-          run: async () => ({
-            success: true,
-            summary: "done",
-            transcript: "done",
-          }),
-        }),
+        create: (_provider, _worktree, policy) => {
+          grantedPolicy = policy;
+          return {
+            run: async () => ({
+              success: true,
+              summary: "done",
+              transcript: "done",
+            }),
+          };
+        },
       },
       noopDelivery(),
     );
     await engine.executeNext(run.id);
-    expect(await projects.executionPolicy(project.id)).toMatchObject({
+    // The run itself was allowed to reach the provider...
+    expect(grantedPolicy).toMatchObject({
       networkAccess: "public",
-      requirePushApproval: true,
       commandAllowlist: expect.arrayContaining(["C:\\Tools\\codex.exe"]),
+    });
+    // ...but the auto-grant is scoped to this run only: the project's own
+    // saved policy is left exactly as configured, not silently widened.
+    expect(await projects.executionPolicy(project.id)).toMatchObject({
+      networkAccess: "none",
+      requirePushApproval: true,
+      commandAllowlist: ["git", "node"],
     });
     opened.client.close();
   });
@@ -467,6 +478,166 @@ describe("WorkflowEngine", () => {
       status: "completed",
       currentStage: null,
     });
+    opened.client.close();
+  });
+  it("marks the run and step failed with the error detail when the agent runner throws", async () => {
+    const opened = await openDatabase(":memory:");
+    const tasks = new TaskRepository(opened.db),
+      projects = new ProjectRepository(opened.db),
+      roles = new AgentRoleRepository(opened.db),
+      providers = new ProviderRepository(opened.db),
+      runs = new WorkflowRepository(opened.db);
+    const project = await projects.create({
+      name: "App",
+      repositoryRoot: "C:\\app",
+      defaultBranch: "main",
+      completionPolicy: "manual",
+    });
+    await projects.saveExecutionPolicy(project.id, {
+      networkAccess: "public",
+      autoGrantAgentAccess: true,
+      environmentAllowlist: [],
+      commandAllowlist: ["codex"],
+      processTimeoutSeconds: 900,
+      requirePushApproval: true,
+      isolatedBrowserProfile: true,
+    });
+    const task = await tasks.create({
+      title: "Fix",
+      source: "manual",
+      assignmentDescription: "Bug",
+      assignedToMe: true,
+      occurredAt: new Date(),
+    });
+    await tasks.assignProject(task.id, project.id);
+    const role = await roles.create(
+      {
+        projectId: null,
+        slug: "worker",
+        name: "Worker",
+        description: "Works",
+        promptTemplate: "Default",
+        providerId: null,
+        modelId: null,
+        capabilities: ["code"],
+        limits: { maxTurns: 2, timeoutSeconds: 30, maxRetries: 1 },
+        enabled: true,
+      },
+      false,
+    );
+    const provider = await providers.create({
+      name: "Provider",
+      kind: "openai",
+      authMethod: "cli",
+      command: "codex",
+      models: ["model"],
+    });
+    await providers.recordCheck(provider.id, "ready", null);
+    await roles.assignModel(role.id, provider.id, "model");
+    const run = await runs.create(task.id, project.id);
+    await runs.addStep(run.id, 0, "implement", role.id, { content: "Snapshot" });
+    await runs.setState(run.id, "running", "implement");
+    const engine = new WorkflowEngine(
+      runs,
+      tasks,
+      projects,
+      roles,
+      providers,
+      { create: async () => ({ id: "w", taskId: task.id, projectId: project.id, path: "C:\\work", branch: "b", baseBranch: "main", status: "active", createdAt: new Date(), releasedAt: null }) } as any,
+      { create: () => ({ run: async () => { throw new Error("Provider request failed (500)"); } }) },
+      noopDelivery(),
+    );
+    await engine.executeNext(run.id);
+    expect(await runs.get(run.id)).toMatchObject({
+      status: "failed",
+      currentStage: "implement",
+      error: "Provider request failed (500)",
+    });
+    expect((await runs.steps(run.id))[0]).toMatchObject({
+      status: "failed",
+      output: "Provider request failed (500)",
+    });
+    opened.client.close();
+  });
+  it("fails the run once a step's attempts exceed its configured retry limit, without invoking the agent again", async () => {
+    const opened = await openDatabase(":memory:");
+    const tasks = new TaskRepository(opened.db),
+      projects = new ProjectRepository(opened.db),
+      roles = new AgentRoleRepository(opened.db),
+      providers = new ProviderRepository(opened.db),
+      runs = new WorkflowRepository(opened.db);
+    const project = await projects.create({
+      name: "App",
+      repositoryRoot: "C:\\app",
+      defaultBranch: "main",
+      completionPolicy: "manual",
+    });
+    await projects.saveExecutionPolicy(project.id, {
+      networkAccess: "public",
+      autoGrantAgentAccess: true,
+      environmentAllowlist: [],
+      commandAllowlist: ["codex"],
+      processTimeoutSeconds: 900,
+      requirePushApproval: true,
+      isolatedBrowserProfile: true,
+    });
+    const task = await tasks.create({
+      title: "Fix",
+      source: "manual",
+      assignmentDescription: "Bug",
+      assignedToMe: true,
+      occurredAt: new Date(),
+    });
+    await tasks.assignProject(task.id, project.id);
+    const role = await roles.create(
+      {
+        projectId: null,
+        slug: "worker",
+        name: "Worker",
+        description: "Works",
+        promptTemplate: "Default",
+        providerId: null,
+        modelId: null,
+        capabilities: ["code"],
+        limits: { maxTurns: 2, timeoutSeconds: 30, maxRetries: 0 },
+        enabled: true,
+      },
+      false,
+    );
+    const provider = await providers.create({
+      name: "Provider",
+      kind: "openai",
+      authMethod: "cli",
+      command: "codex",
+      models: ["model"],
+    });
+    await providers.recordCheck(provider.id, "ready", null);
+    await roles.assignModel(role.id, provider.id, "model");
+    const run = await runs.create(task.id, project.id);
+    await runs.addStep(run.id, 0, "implement", role.id, { content: "Snapshot" });
+    await runs.setState(run.id, "running", "implement");
+    let invocations = 0;
+    const engine = new WorkflowEngine(
+      runs,
+      tasks,
+      projects,
+      roles,
+      providers,
+      { create: async () => ({ id: "w", taskId: task.id, projectId: project.id, path: "C:\\work", branch: "b", baseBranch: "main", status: "active", createdAt: new Date(), releasedAt: null }) } as any,
+      { create: () => ({ run: async () => { invocations += 1; return { success: false, summary: "The implementation did not compile", transcript: "" }; } }) },
+      noopDelivery(),
+    );
+    await engine.executeNext(run.id);
+    expect(await runs.get(run.id)).toMatchObject({ status: "failed" });
+    expect(invocations).toBe(1);
+    // Simulate the operator resuming the failed run for a retry.
+    await runs.setState(run.id, "running", "implement");
+    await engine.executeNext(run.id);
+    expect(await runs.get(run.id)).toMatchObject({
+      status: "failed",
+      error: "implement exceeded its retry limit",
+    });
+    expect(invocations).toBe(1);
     opened.client.close();
   });
 });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { GuardedCommandExecutor } from "../src/infrastructure/execution/guarded-command-executor.js";
@@ -53,6 +53,32 @@ describe("GuardedCommandExecutor", () => {
         network: "none",
       }),
     ).rejects.toThrow("outside");
+  });
+  it("resolves an allowlisted command from PATH, ignoring a same-named file planted in the worktree", async () => {
+    const root = await mkdtemp(join(tmpdir(), "awenes-exec-"));
+    dirs.push(root);
+    // Simulate a task worktree (the agent's own writable, untrusted output)
+    // containing a decoy that shadows a trusted command's name. Node's
+    // spawn() must never let cwd take precedence over PATH when resolving it.
+    const decoyPath = join(root, process.platform === "win32" ? "node.cmd" : "node");
+    await writeFile(decoyPath, process.platform === "win32" ? "@echo planted\r\n" : "#!/bin/sh\necho planted\n", "utf8");
+    if (process.platform !== "win32") await chmod(decoyPath, 0o755);
+    const runner = new GuardedCommandExecutor(root, {
+      networkAccess: "none",
+      autoGrantAgentAccess: false,
+      environmentAllowlist: [],
+      commandAllowlist: ["node"],
+      processTimeoutSeconds: 5,
+      requirePushApproval: true,
+      isolatedBrowserProfile: true,
+    });
+    const result = await runner.execute({
+      command: "node",
+      args: ["-e", "process.stdout.write('real')"],
+      cwd: root,
+      network: "none",
+    });
+    expect(result.stdout).toBe("real");
   });
   it("settles with a timed-out result instead of hanging when a process outlives its timeout", async () => {
     const root = await mkdtemp(join(tmpdir(), "awenes-exec-"));

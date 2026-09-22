@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DesktopSnapshot } from "../../../contracts";
 import type { ExecutionPolicy, ReadinessReport } from "../../../../src/domain/project";
 import { BrowserTestSetup } from "./browser-test-setup";
@@ -11,12 +11,16 @@ export function Safety({ data }: { data: DesktopSnapshot }) {
   const [policy, setPolicy] = useState<ExecutionPolicy | null>(null);
   const [readiness, setReadiness] = useState<ReadinessReport | null>(null);
   const [saved, setSaved] = useState(false);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
   useEffect(() => {
     if (!selected) {
       setPolicy(null);
       return;
     }
-    void window.awenes.executionPolicy(selected).then(setPolicy);
+    void window.awenes.executionPolicy(selected).then((result) => {
+      if (selectedRef.current === selected) setPolicy(result);
+    });
     setReadiness(null);
   }, [selected]);
   async function save() {

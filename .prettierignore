@@ -1,0 +1,8 @@
+node_modules
+.pnpm-store
+dist
+dist-desktop
+release
+release-*
+data
+pnpm-lock.yaml

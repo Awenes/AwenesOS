@@ -15,6 +15,7 @@ export class PlaywrightBrowserAutomation implements BrowserAutomation {
     await mkdir(outputDirectory, { recursive: true });
     const profile = await mkdtemp(join(tmpdir(), "awenes-browser-"));
     let server: ManagedProcess | null = null;
+    let context: Awaited<ReturnType<typeof chromium.launchPersistentContext>> | null = null;
     try {
       if (config.setupCommand)
         await ensure(
@@ -31,7 +32,7 @@ export class PlaywrightBrowserAutomation implements BrowserAutomation {
         network: "localhost",
       });
       await healthy(config.healthCheckUrl);
-      const context = await chromium.launchPersistentContext(profile, {
+      context = await chromium.launchPersistentContext(profile, {
         executablePath: config.browserExecutable,
         headless: true,
       });
@@ -54,7 +55,7 @@ export class PlaywrightBrowserAutomation implements BrowserAutomation {
         (action) => action.type === "fill",
       );
       await context.tracing.start({
-        screenshots: true,
+        screenshots: !usesCredentials,
         snapshots: !usesCredentials,
         sources: true,
       });
@@ -99,11 +100,12 @@ export class PlaywrightBrowserAutomation implements BrowserAutomation {
           });
         }
       }
-      const screenshotPath = join(outputDirectory, "final.png"),
+      const screenshotPath = usesCredentials
+          ? null
+          : join(outputDirectory, "final.png"),
         tracePath = join(outputDirectory, "trace.zip");
-      await page.screenshot({ path: screenshotPath, fullPage: true });
+      if (screenshotPath) await page.screenshot({ path: screenshotPath, fullPage: true });
       await context.tracing.stop({ path: tracePath });
-      await context.close();
       return {
         passed:
           assertions.every((value) => value.passed) &&
@@ -115,6 +117,7 @@ export class PlaywrightBrowserAutomation implements BrowserAutomation {
         assertions,
       };
     } finally {
+      if (context) await context.close().catch(() => {});
       if (server) await server.stop();
       if (config.cleanupCommand)
         await commands.execute({

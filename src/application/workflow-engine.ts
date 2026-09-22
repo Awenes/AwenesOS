@@ -93,14 +93,17 @@ export class WorkflowEngine {
       const needsCommand = Boolean(
         command && !policy.commandAllowlist.includes(command),
       );
+      // Widen access for this run's execution only; the project's saved
+      // policy is left untouched so the auto-grant convenience doesn't
+      // silently and permanently change what the user configured.
       if (needsNetwork || needsCommand)
-        policy = await this.projects.saveExecutionPolicy(run.projectId, {
+        policy = {
           ...policy,
           networkAccess: "public",
           commandAllowlist: command
             ? [...new Set([...policy.commandAllowlist, command])]
             : policy.commandAllowlist,
-        });
+        };
     }
     new ExecutionGuard(project.repositoryRoot, policy).assertNetwork("public");
     const worktree = await this.worktrees.create(task.id);

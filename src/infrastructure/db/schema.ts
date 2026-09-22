@@ -17,7 +17,7 @@ export const tasks = sqliteTable("tasks", {
   ,acceptanceCriteria: text("acceptance_criteria", { mode: "json" }).$type<string[]>().notNull().default([]),
   archivedAt: integer("archived_at", { mode: "timestamp_ms" }),
   deletedAt: integer("deleted_at", { mode: "timestamp_ms" })
-});
+}, (table) => [index("tasks_project_id_idx").on(table.projectId)]);
 
 export const taskEvents = sqliteTable("task_events", {
   id: text("id").primaryKey(),
@@ -25,7 +25,7 @@ export const taskEvents = sqliteTable("task_events", {
   type: text("type").notNull(),
   data: text("data", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
   occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull()
-});
+}, (table) => [index("task_events_task_id_idx").on(table.taskId)]);
 
 export const evidence = sqliteTable("task_evidence", {
   id: text("id").primaryKey(),
@@ -73,7 +73,7 @@ export const notificationPreferences = sqliteTable("notification_preferences", {
 
 export const manualCrmUpdates = sqliteTable("manual_crm_updates", {
   id: text("id").primaryKey(), taskId: text("task_id").notNull().references(() => tasks.id), desiredStatus: text("desired_status").notNull(), description: text("description"), status: text("status").notNull(), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(), confirmedAt: integer("confirmed_at", { mode: "timestamp_ms" }), supersededAt: integer("superseded_at", { mode: "timestamp_ms" })
-});
+}, (table) => [index("manual_crm_updates_task_status_idx").on(table.taskId, table.status)]);
 
 export const projects = sqliteTable("projects", {
   id: text("id").primaryKey(),
@@ -92,7 +92,7 @@ export const projectEvents = sqliteTable("project_events", {
   type: text("type").notNull(),
   data: text("data", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
   occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull()
-});
+}, (table) => [index("project_events_project_id_idx").on(table.projectId)]);
 
 export const projectExecutionPolicies = sqliteTable("project_execution_policies", {
   projectId: text("project_id").primaryKey().references(() => projects.id),
@@ -127,7 +127,7 @@ export const agentRoles = sqliteTable("agent_roles", {
 export const agentRoleEvents = sqliteTable("agent_role_events", {
   id: text("id").primaryKey(), roleId: text("role_id").notNull().references(() => agentRoles.id), type: text("type").notNull(),
   data: text("data", { mode: "json" }).$type<Record<string, unknown>>().notNull(), occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull()
-});
+}, (table) => [index("agent_role_events_role_id_idx").on(table.roleId)]);
 
 export const providerConnections = sqliteTable("provider_connections", {
   id: text("id").primaryKey(),
@@ -149,7 +149,7 @@ export const providerEvents = sqliteTable("provider_events", {
   type: text("type").notNull(),
   data: text("data", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
   occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull()
-});
+}, (table) => [index("provider_events_provider_id_idx").on(table.providerId)]);
 
 export const rolePromptVersions = sqliteTable("role_prompt_versions", {
   id: text("id").primaryKey(), roleId: text("role_id").notNull().references(() => agentRoles.id), version: integer("version").notNull(),
@@ -171,21 +171,21 @@ export const workflowRuns = sqliteTable("workflow_runs", {
   id:text("id").primaryKey(), taskId:text("task_id").notNull().references(()=>tasks.id), projectId:text("project_id").notNull().references(()=>projects.id),
   status:text("status").notNull(), currentStage:text("current_stage"), createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull(), updatedAt:integer("updated_at",{mode:"timestamp_ms"}).notNull(),
   startedAt:integer("started_at",{mode:"timestamp_ms"}), completedAt:integer("completed_at",{mode:"timestamp_ms"}), error:text("error"), revision:integer("revision").notNull().default(1), lastActivity:text("last_activity"), leaseOwner:text("lease_owner"), leaseExpiresAt:integer("lease_expires_at",{mode:"timestamp_ms"}), archivedAt:integer("archived_at",{mode:"timestamp_ms"}), deletedAt:integer("deleted_at",{mode:"timestamp_ms"})
-});
+}, (table) => [index("workflow_runs_task_idx").on(table.taskId)]);
 export const workflowRunTombstones=sqliteTable("workflow_run_tombstones",{runId:text("run_id").primaryKey(),deletedAt:integer("deleted_at",{mode:"timestamp_ms"}).notNull()});
 export const workflowPlans=sqliteTable("workflow_plans",{id:text("id").primaryKey(),runId:text("run_id").notNull().references(()=>workflowRuns.id),version:integer("version").notNull(),content:text("content").notNull(),status:text("status").notNull(),createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull(),decidedAt:integer("decided_at",{mode:"timestamp_ms"})},table=>[uniqueIndex("workflow_plans_run_version_unique").on(table.runId,table.version)]);
-export const workflowInterventions=sqliteTable("workflow_interventions",{id:text("id").primaryKey(),runId:text("run_id").notNull().references(()=>workflowRuns.id),kind:text("kind").notNull(),title:text("title").notNull(),detail:text("detail").notNull(),status:text("status").notNull(),createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull(),resolvedAt:integer("resolved_at",{mode:"timestamp_ms"})});
+export const workflowInterventions=sqliteTable("workflow_interventions",{id:text("id").primaryKey(),runId:text("run_id").notNull().references(()=>workflowRuns.id),kind:text("kind").notNull(),title:text("title").notNull(),detail:text("detail").notNull(),status:text("status").notNull(),createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull(),resolvedAt:integer("resolved_at",{mode:"timestamp_ms"})},table=>[index("workflow_interventions_run_status_idx").on(table.runId,table.status)]);
 export const taskTombstones=sqliteTable("task_tombstones",{taskId:text("task_id").primaryKey(),deletedAt:integer("deleted_at",{mode:"timestamp_ms"}).notNull()});
 export const workflowSteps = sqliteTable("workflow_steps", {
   id:text("id").primaryKey(), runId:text("run_id").notNull().references(()=>workflowRuns.id), ordinal:integer("ordinal").notNull(), stage:text("stage").notNull(), roleId:text("role_id").references(()=>agentRoles.id),
   status:text("status").notNull(), attempt:integer("attempt").notNull(), instructionSnapshot:text("instruction_snapshot",{mode:"json"}).$type<Record<string,unknown>>(), output:text("output"), startedAt:integer("started_at",{mode:"timestamp_ms"}), completedAt:integer("completed_at",{mode:"timestamp_ms"})
-});
+}, (table) => [index("workflow_steps_run_idx").on(table.runId)]);
 export const workflowApprovals = sqliteTable("workflow_approvals", {
   id:text("id").primaryKey(), runId:text("run_id").notNull().references(()=>workflowRuns.id), kind:text("kind").notNull(), status:text("status").notNull(), detail:text("detail").notNull(), requestedAt:integer("requested_at",{mode:"timestamp_ms"}).notNull(), decidedAt:integer("decided_at",{mode:"timestamp_ms"})
-});
+}, (table) => [index("workflow_approvals_run_idx").on(table.runId)]);
 export const workflowEvents = sqliteTable("workflow_events", {
   id:text("id").primaryKey(), runId:text("run_id").notNull().references(()=>workflowRuns.id), type:text("type").notNull(), data:text("data",{mode:"json"}).$type<Record<string,unknown>>().notNull(), occurredAt:integer("occurred_at",{mode:"timestamp_ms"}).notNull()
-});
+}, (table) => [index("workflow_events_run_idx").on(table.runId)]);
 export const browserTestConfigs=sqliteTable("browser_test_configs",{projectId:text("project_id").primaryKey().references(()=>projects.id),config:text("config",{mode:"json"}).$type<Record<string,unknown>>().notNull(),updatedAt:integer("updated_at",{mode:"timestamp_ms"}).notNull()});
-export const browserTestEvidence=sqliteTable("browser_test_evidence",{id:text("id").primaryKey(),runId:text("run_id").notNull().references(()=>workflowRuns.id),passed:integer("passed",{mode:"boolean"}).notNull(),screenshotPath:text("screenshot_path"),tracePath:text("trace_path"),consoleErrors:text("console_errors",{mode:"json"}).$type<string[]>().notNull(),failedRequests:text("failed_requests",{mode:"json"}).$type<string[]>().notNull(),assertions:text("assertions",{mode:"json"}).$type<Array<Record<string,unknown>>>().notNull(),createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull()});
+export const browserTestEvidence=sqliteTable("browser_test_evidence",{id:text("id").primaryKey(),runId:text("run_id").notNull().references(()=>workflowRuns.id),passed:integer("passed",{mode:"boolean"}).notNull(),screenshotPath:text("screenshot_path"),tracePath:text("trace_path"),consoleErrors:text("console_errors",{mode:"json"}).$type<string[]>().notNull(),failedRequests:text("failed_requests",{mode:"json"}).$type<string[]>().notNull(),assertions:text("assertions",{mode:"json"}).$type<Array<Record<string,unknown>>>().notNull(),createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull()},table=>[index("browser_test_evidence_run_idx").on(table.runId)]);
 export const gitDeliveries=sqliteTable("git_deliveries",{id:text("id").primaryKey(),runId:text("run_id").notNull().references(()=>workflowRuns.id),branch:text("branch").notNull(),commitSha:text("commit_sha"),pushed:integer("pushed",{mode:"boolean"}).notNull(),remote:text("remote"),review:text("review",{mode:"json"}).$type<Record<string,unknown>>().notNull(),createdAt:integer("created_at",{mode:"timestamp_ms"}).notNull(),updatedAt:integer("updated_at",{mode:"timestamp_ms"}).notNull()},table=>[uniqueIndex("git_deliveries_run_unique").on(table.runId)]);

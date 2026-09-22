@@ -9,6 +9,7 @@ import { openDatabase } from "../src/infrastructure/db/database.js";
 import { AgentRoleRepository } from "../src/infrastructure/repositories/agent-role-repository.js";
 import { InstructionRepository } from "../src/infrastructure/repositories/instruction-repository.js";
 import { ProjectRepository } from "../src/infrastructure/repositories/project-repository.js";
+import { ProviderRepository } from "../src/infrastructure/repositories/provider-repository.js";
 import { TaskRepository } from "../src/infrastructure/repositories/task-repository.js";
 import { WorkflowRepository } from "../src/infrastructure/repositories/workflow-repository.js";
 describe("WorkflowService", () => {
@@ -18,7 +19,7 @@ describe("WorkflowService", () => {
       projects = new ProjectRepository(opened.db),
       roles = new AgentRoleRepository(opened.db),
       runs = new WorkflowRepository(opened.db);
-    const roleService = new AgentRoleService(roles, projects);
+    const roleService = new AgentRoleService(roles, projects, new ProviderRepository(opened.db));
     await roleService.initializeBuiltIns();
     const project = await new ProjectService(projects, {
       inspect: async (p) => ({

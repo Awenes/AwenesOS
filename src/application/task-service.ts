@@ -56,6 +56,11 @@ export class TaskService {
     projects: ProjectRepository,
   ) {
     await projects.get(projectId);
+    const worktree = await projects.worktreeForTask(id);
+    if (worktree?.status === "active")
+      throw new Error(
+        "Release the task's active worktree before reassigning its project",
+      );
     return this.repository.assignProject(id, projectId);
   }
 

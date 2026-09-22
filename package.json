@@ -20,7 +20,10 @@
     "desktop:build": "vite build --config vite.renderer.config.ts && tsc -p tsconfig.desktop.json",
     "desktop:start": "vite build --config vite.renderer.config.ts && tsc -p tsconfig.desktop.json && electron .",
     "package:win": "pnpm build && electron-builder --win nsis",
+    "package:verify": "electron-builder --win nsis --publish=never",
     "db:generate": "drizzle-kit generate",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest run",
     "test:desktop-smoke": "node scripts/desktop-smoke.mjs",
     "test:watch": "vitest"
@@ -67,8 +70,6 @@
     "dotenv": "^17.2.2",
     "drizzle-orm": "^0.45.2",
     "playwright-core": "^1.63.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
     "zod": "^4.1.5"
   },
   "devDependencies": {
@@ -80,6 +81,8 @@
     "electron": "^44.3.0",
     "electron-builder": "^26.0.12",
     "prettier": "^3.9.6",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vite": "^8.2.2",
