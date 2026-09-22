@@ -9,7 +9,7 @@ import {
 } from "electron";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { readFile, writeFile } from "node:fs/promises";
-import { z } from "zod";
+import { z, ZodError } from "zod";
 import type { DesktopSnapshot } from "./contracts.js";
 import { AgentRoleService } from "../src/application/agent-role-service.js";
 import { BrowserTestService } from "../src/application/browser-test-service.js";
@@ -290,7 +290,15 @@ function registerIpc(window: BrowserWindow, s: Services) {
   ) =>
     ipcMain.handle(channel, async (event, input) => {
       if (!trusted(event.sender)) throw new Error("Untrusted desktop request");
-      return operation(input);
+      try {
+        return await operation(input);
+      } catch (error) {
+        if (error instanceof ZodError)
+          throw new Error(
+            `Check your input: ${error.issues.map((issue) => issue.message).join("; ")}`,
+          );
+        throw error;
+      }
     });
   handle("awenes:snapshot", async () => {
     const [

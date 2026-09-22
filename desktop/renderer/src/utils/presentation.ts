@@ -23,8 +23,32 @@ export const navigation: ReadonlyArray<readonly [View, string]> = [
   ["safety", "Safety"],
 ];
 
+const KNOWN_CASINGS: Record<string, string> = {
+  api: "API",
+  cli: "CLI",
+  openai: "OpenAI",
+};
 export function pretty(value: string) {
-  return value.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
+  return value
+    .replaceAll("_", " ")
+    .split(" ")
+    .map(
+      (word) =>
+        KNOWN_CASINGS[word.toLowerCase()] ??
+        word.charAt(0).toUpperCase() + word.slice(1),
+    )
+    .join(" ");
+}
+
+const DANGER_WORDS = new Set(["failed", "fail", "error", "rejected", "reject"]);
+const SUCCESS_WORDS = new Set(["completed", "complete", "ready", "verified", "passed"]);
+const WARNING_WORDS = new Set(["paused", "pause", "pending", "approval", "awaiting"]);
+export function badgeTone(text: string) {
+  const words = text.toLowerCase().split(/\s+/);
+  if (words.some((word) => DANGER_WORDS.has(word))) return "danger";
+  if (words.some((word) => SUCCESS_WORDS.has(word))) return "success";
+  if (words.some((word) => WARNING_WORDS.has(word))) return "warning";
+  return "neutral";
 }
 
 export function projectName(data: DesktopSnapshot, id: string | null) {
@@ -47,6 +71,10 @@ export function splitCommaSeparated(value: string) {
 
 export function splitLines(value: string) {
   return value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+}
+
+export function pluralize(count: number, noun: string) {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
 export function folderName(path: string) {

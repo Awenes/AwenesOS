@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Toast } from "./components/feedback";
+import { ConfirmDialog } from "./components/confirm-dialog";
+import { useConfirm } from "./hooks/use-confirm";
 import { Safety } from "./components/safety";
 import { Runs } from "./components/workflow-runs";
 import { AppSidebar } from "./components/app-sidebar";
@@ -20,12 +22,28 @@ export function DesktopApp() {
     return saved === null ? window.matchMedia("(max-width: 1080px)").matches : saved === "true";
   });
   useEffect(() => {
-    window.localStorage.setItem("awenes.sidebar.collapsed", String(sidebarCollapsed));
-  }, [sidebarCollapsed]);
+    if (window.localStorage.getItem("awenes.sidebar.collapsed") !== null) return;
+    const query = window.matchMedia("(max-width: 1080px)");
+    const sync = () => setSidebarCollapsed(query.matches);
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
+  function toggleSidebar() {
+    setSidebarCollapsed((value) => {
+      const next = !value;
+      window.localStorage.setItem("awenes.sidebar.collapsed", String(next));
+      return next;
+    });
+  }
   const [taskReview, setTaskReview] = useState<{ id: string; request: number } | null>(null);
   function openTaskReview(id: string) {
     setTaskReview({ id, request: Date.now() });
     setView("tasks");
+  }
+  const [runReview, setRunReview] = useState<{ id: string; request: number } | null>(null);
+  function openRunReview(id: string) {
+    setRunReview({ id, request: Date.now() });
+    setView("runs");
   }
   const {
     snapshot,
@@ -37,6 +55,7 @@ export function DesktopApp() {
     dismissError,
     refresh,
   } = useDesktopState();
+  const { confirm, request: confirmRequest, decide: decideConfirm } = useConfirm();
   const active = snapshot.tasks.filter((task) =>
     [
       "planned",
@@ -56,7 +75,8 @@ export function DesktopApp() {
       </a>
       <ActivityIndicator visible={loading || pendingOperations > 0} />
       <Toast value={toast} dismiss={dismissToast} />
-      <AppSidebar view={view} collapsed={sidebarCollapsed} setView={setView} toggle={() => setSidebarCollapsed((value) => !value)} snapshot={snapshot} />
+      <ConfirmDialog request={confirmRequest} decide={decideConfirm} />
+      <AppSidebar view={view} collapsed={sidebarCollapsed} setView={setView} toggle={toggleSidebar} snapshot={snapshot} />
       <main id="main-content" tabIndex={-1}>
         <header>
           <div className="page-heading">
@@ -104,20 +124,42 @@ export function DesktopApp() {
         )}
         {view === "projects" && <Projects data={snapshot} refresh={refresh} />}
         {view === "tasks" && (
-          <Tasks data={snapshot} refresh={refresh} reviewTarget={taskReview} />
+          <Tasks
+            data={snapshot}
+            refresh={refresh}
+            reviewTarget={taskReview}
+            confirm={confirm}
+          />
         )}
         {view === "runs" && (
-          <Runs data={snapshot} refresh={refresh} reviewTask={openTaskReview} />
+          <Runs
+            data={snapshot}
+            refresh={refresh}
+            reviewTask={openTaskReview}
+            reviewTarget={runReview}
+            confirm={confirm}
+          />
         )}
         {view === "approvals" && (
-          <Approvals data={snapshot} refresh={refresh} />
+          <Approvals
+            data={snapshot}
+            refresh={refresh}
+            reviewTask={openTaskReview}
+            confirm={confirm}
+          />
         )}
         {view === "agents" && <Agents data={snapshot} refresh={refresh} />}
         {view === "providers" && (
           <Providers data={snapshot} refresh={refresh} />
         )}
         {view === "notifications" && (
-          <Notifications data={snapshot} refresh={refresh} reviewTask={openTaskReview} />
+          <Notifications
+            data={snapshot}
+            refresh={refresh}
+            reviewTask={openTaskReview}
+            reviewRun={openRunReview}
+            navigate={setView}
+          />
         )}
         {view === "safety" && <Safety data={snapshot} />}
       </main>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   folderName,
+  pluralize,
   pretty,
   splitCommaSeparated,
   splitLines,
@@ -17,6 +18,9 @@ describe("renderer presentation helpers", () => {
 
   it("normalizes labels and form lists consistently", () => {
     expect(pretty("awaiting_approval")).toBe("Awaiting Approval");
+    expect(pretty("api_key")).toBe("API Key");
+    expect(pretty("openai")).toBe("OpenAI");
+    expect(pretty("cli")).toBe("CLI");
     expect(splitCommaSeparated("git, node, git")).toEqual([
       "git",
       "node",
@@ -27,6 +31,9 @@ describe("renderer presentation helpers", () => {
       "Build succeeds",
     ]);
     expect(folderName("C:\\work\\customer-portal\\")).toBe("customer-portal");
+    expect(pluralize(1, "task")).toBe("1 task");
+    expect(pluralize(0, "task")).toBe("0 tasks");
+    expect(pluralize(2, "task")).toBe("2 tasks");
   });
 
   it("resolves task names across active and archived collections", () => {

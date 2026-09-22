@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import type { DesktopSnapshot } from "../../../contracts";
 import { Badge, Empty, Pagination } from "./ui";
 import { usePagination } from "../hooks/use-pagination";
-import { folderName, pretty } from "../utils/presentation";
+import { folderName, pluralize, pretty } from "../utils/presentation";
 
 export function Projects({
   data,
@@ -142,7 +142,10 @@ export function Projects({
                 <Badge text={pretty(project.completionPolicy)} />
                 <Badge text={`${pretty(project.autonomyMode)} mode`} />
                 <Badge
-                  text={`${data.tasks.filter((t) => t.projectId === project.id).length} tasks`}
+                  text={pluralize(
+                    data.tasks.filter((t) => t.projectId === project.id).length,
+                    "task",
+                  )}
                 />
               </div>
             </div>

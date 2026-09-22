@@ -304,7 +304,8 @@ h1 {
 }
 .ghost,
 .primary,
-.small-button {
+.small-button,
+.danger {
   border: 1px solid #d9deea;
   background: #fff;
   color: #364055;
@@ -316,6 +317,12 @@ h1 {
   background: #6656e8;
   color: white;
   border-color: #6656e8;
+  font-weight: 700;
+}
+.danger {
+  background: #d94f5c;
+  color: white;
+  border-color: #d94f5c;
   font-weight: 700;
 }
 .ghost:hover,
@@ -467,11 +474,33 @@ button:disabled {
   font-size: 12px;
   cursor: pointer;
 }
+.link-button {
+  border: 0;
+  background: transparent;
+  color: #6656e8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.link-button:hover {
+  text-decoration: underline;
+}
 .row,
 .task-row {
   gap: 14px;
   padding: 14px 4px;
   border-top: 1px solid #edf0f5;
+}
+.task-status {
+  flex: none;
+}
+.task-row-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .row:first-of-type {
   border-top: 0;
@@ -756,6 +785,51 @@ textarea {
   display: block;
   font-size: 12px;
 }
+.overflow-menu {
+  position: relative;
+}
+.overflow-menu-trigger {
+  padding: 6px 10px;
+  font-size: 15px;
+  line-height: 1;
+}
+.overflow-menu-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 160px;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid #dce1ec;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 16px 40px #10182c2e;
+}
+.overflow-menu-panel button {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #364055;
+}
+.overflow-menu-panel button:hover:not(:disabled) {
+  background: #f4f2ff;
+}
+.overflow-menu-panel button.danger {
+  color: #b3283a;
+  background: transparent;
+  border: 0;
+  font-weight: 500;
+}
+.overflow-menu-panel button.danger:hover:not(:disabled) {
+  background: #fbeaec;
+}
 .multi-select-option small {
   display: block;
   margin-top: 2px;
@@ -1025,6 +1099,29 @@ pre {
   background: #ebe8ff;
   border-color: #7768ff;
 }
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: #05070ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.confirm-dialog {
+  width: min(420px, 100%);
+  background: #fff;
+  border-radius: 12px;
+  padding: 22px;
+  box-shadow: 0 24px 70px #00000040;
+}
+.confirm-dialog p {
+  margin: 0 0 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
 .floating-form {
   position: absolute;
   z-index: 5;
@@ -1089,7 +1186,8 @@ h1, h2, h3, strong { color: #f5f7fc; }
 .panel,
 .project-card,
 .agent-card,
-.form-card { background: #121722; border-color: #252c3c; box-shadow: 0 14px 45px #00000028; }
+.form-card,
+.confirm-dialog { background: #121722; border-color: #252c3c; box-shadow: 0 14px 45px #00000028; }
 .metric,
 .panel,
 .project-card,
@@ -1111,7 +1209,8 @@ h1, h2, h3, strong { color: #f5f7fc; }
 .model-picker,
 .summary-grid > div { border-color: #2a3244; background: #0f141e; }
 .advanced summary,
-.panel-head button { color: #a393ff; }
+.panel-head button,
+.link-button { color: #a393ff; }
 .row,
 .task-row,
 .approval-card,
@@ -1153,6 +1252,11 @@ textarea:focus { border-color: #8b7aff; box-shadow: 0 0 0 3px #8b7aff24; }
 .multi-select-panel { background: #121722; border-color: #2a3244; box-shadow: 0 20px 50px #00000040; }
 .multi-select-option:hover { background: #171c2a; }
 .multi-select-option small { color: #7f899d; }
+.overflow-menu-panel { background: #121722; border-color: #2a3244; box-shadow: 0 20px 50px #00000040; }
+.overflow-menu-panel button { color: #d8deeb; }
+.overflow-menu-panel button:hover:not(:disabled) { background: #171c2a; }
+.overflow-menu-panel button.danger { color: #ff9aa9; }
+.overflow-menu-panel button.danger:hover:not(:disabled) { background: #321b23; }
 .empty { color: #8f98ab; }
 .empty strong { color: #e6eaf3; }
 .error { background: #321820; border-color: #67303e; color: #ff9aac; }
@@ -1227,6 +1331,7 @@ summary:focus-visible { outline: 2px solid #a99bff; outline-offset: 2px; }
   .section-bar,
   .task-row,
   .approval-card { flex-wrap: wrap; }
+  .task-row-actions { flex-basis: 100%; }
   .form-grid { grid-template-columns: minmax(0, 1fr); }
   .header-actions { flex-wrap: wrap; justify-content: flex-end; }
 }

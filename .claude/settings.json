@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk 'NR==355,NR==365 {print NR\": \"$0}' desktop/renderer/src/components/tasks.tsx)",
+      "Bash(grep -n \"^\\\\.danger\\\\|, \\\\.danger\\\\|\\\\.danger {\" desktop/renderer/src/styles.css)"
+    ]
+  }
+}

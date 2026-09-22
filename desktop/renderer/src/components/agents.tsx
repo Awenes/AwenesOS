@@ -59,6 +59,11 @@ export function Agents({
               </button>
             </div>
             <p>{role.description}</p>
+            {role.enabled && !role.providerId && (
+              <p className="setup-warning">
+                No provider assigned yet. Runs that reach this role will fail until you assign one below.
+              </p>
+            )}
             <div className="tags">
               {role.capabilities.map((cap) => (
                 <Badge key={cap} text={pretty(cap)} />

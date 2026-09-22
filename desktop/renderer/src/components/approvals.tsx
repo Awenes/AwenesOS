@@ -6,16 +6,23 @@ import { pretty, taskName } from "../utils/presentation";
 export function Approvals({
   data,
   refresh,
+  reviewTask,
+  confirm,
 }: {
   data: DesktopSnapshot;
   refresh: () => Promise<void>;
+  reviewTask: (taskId: string) => void;
+  confirm: (message: string, confirmLabel?: string) => Promise<boolean>;
 }) {
   const approvalPage = usePagination(data.approvals);
   return (
     <section className="stack">
       <Panel title="Approval Inbox">
         {data.approvals.length ? (
-          approvalPage.items.map((item) => (
+          approvalPage.items.map((item) => {
+            const taskId =
+              data.runs.find((run) => run.id === item.runId)?.taskId ?? "";
+            return (
             <div className="approval-card" key={item.id}>
               <div className="grow">
                 <strong>{pretty(item.kind)} approval</strong>
@@ -26,17 +33,25 @@ export function Approvals({
                     <pre>{item.planContent}</pre>
                   </div>
                 )}
-                <small>
-                  {taskName(
-                    data,
-                    data.runs.find((run) => run.id === item.runId)?.taskId ??
-                      "",
-                  )}
-                </small>
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => reviewTask(taskId)}
+                >
+                  {taskName(data, taskId)}
+                </button>
               </div>
               <button
                 className="ghost"
                 onClick={async () => {
+                  if (
+                    item.kind !== "plan" &&
+                    !(await confirm(
+                      "This cancels the entire workflow run, not just this step. Completed work stays in the task's worktree, but the run itself cannot be resumed. Cancel this run?",
+                      "Cancel run",
+                    ))
+                  )
+                    return;
                   await window.awenes.decideApproval({
                     approvalId: item.id,
                     approved: false,
@@ -44,7 +59,7 @@ export function Approvals({
                   await refresh();
                 }}
               >
-                {item.kind === "plan" ? "Request changes" : "Reject"}
+                {item.kind === "plan" ? "Request changes" : "Cancel run"}
               </button>
               <button
                 className="primary"
@@ -59,7 +74,8 @@ export function Approvals({
                 Approve
               </button>
             </div>
-          ))
+            );
+          })
         ) : (
           <Empty
             title="Nothing Needs Approval"

@@ -46,7 +46,8 @@ async function invoke<T>(channel: string, input?: unknown): Promise<T> {
     return result;
   } catch (error) {
     const details = error instanceof Error ? error.message : String(error);
-    const message = /ENOENT|not found/i.test(details) ? "A required file or command could not be found. Check this project's setup." : /network access denied/i.test(details) ? "This run needs network access. Review the project's permissions." : /not allowed|permission|denied/i.test(details) ? "This action needs permission. Review the project's safety settings." : "That action could not be completed. Review the details and try again.";
+    const validation = /Check your input: (.+)/i.exec(details);
+    const message = validation ? `Check your input: ${validation[1]}` : /ENOENT|not found/i.test(details) ? "A required file or command could not be found. Check this project's setup." : /network access denied/i.test(details) ? "This run needs network access. Review the project's permissions." : /not allowed|permission|denied/i.test(details) ? "This action needs permission. Review the project's safety settings." : "That action could not be completed. Review the details and try again.";
     for (const listener of feedbackListeners) listener({ message, tone: "error", details });
     throw error;
   } finally {

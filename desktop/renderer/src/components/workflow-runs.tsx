@@ -10,10 +10,14 @@ export function Runs({
   data,
   refresh,
   reviewTask,
+  reviewTarget,
+  confirm,
 }: {
   data: DesktopSnapshot;
   refresh: () => Promise<void>;
   reviewTask: (taskId: string) => void;
+  reviewTarget?: { id: string; request: number } | null;
+  confirm: (message: string, confirmLabel?: string) => Promise<boolean>;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [details, setDetails] = useState<any>(null);
@@ -42,6 +46,13 @@ export function Runs({
     setSelected(id);
     setDetails(await window.awenes.runDetails(id));
   }
+  useEffect(() => {
+    if (!reviewTarget) return;
+    if (data.archivedRuns.some((run) => run.id === reviewTarget.id))
+      setScope("archived");
+    else setScope("active");
+    void open(reviewTarget.id);
+  }, [reviewTarget]);
   async function action(
     runId: string,
     action: "next" | "pause" | "resume" | "cancel" | "archive" | "restore" | "delete",
@@ -59,7 +70,7 @@ export function Runs({
     }
   }
   async function remove(runId: string, action: "archive" | "restore" | "delete") {
-    if (action === "delete" && !window.confirm("Delete this run? Its audit tombstone will be retained.")) return;
+    if (action === "delete" && !(await confirm("Delete this run? Its audit tombstone will be retained.", "Delete"))) return;
     setBusy(true);
     try {
       await window.awenes.runAction({ runId, action });

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { DesktopSnapshot } from "../../../contracts";
 import { Badge, Empty, Pagination, Panel } from "./ui";
+import { OverflowMenu } from "./overflow-menu";
 import { TaskReview } from "./task-review";
 import { usePagination } from "../hooks/use-pagination";
 import { pretty, projectName, splitLines } from "../utils/presentation";
@@ -9,10 +10,12 @@ export function Tasks({
   data,
   refresh,
   reviewTarget,
+  confirm,
 }: {
   data: DesktopSnapshot;
   refresh: () => Promise<void>;
   reviewTarget: { id: string; request: number } | null;
+  confirm: (message: string, confirmLabel?: string) => Promise<boolean>;
 }) {
   const [project, setProject] = useState("all");
   const [scope, setScope] = useState<"active" | "archived">("active");
@@ -96,7 +99,7 @@ export function Tasks({
     }
   }
   async function finishReview() {
-    if (!details || !window.confirm("Mark this task complete locally? Review the evidence and summary first.")) return;
+    if (!details || !(await confirm("Mark this task complete locally? Review the evidence and summary first.", "Finish locally"))) return;
     setReviewBusy(true);
     try {
       await window.awenes.taskCompletion({ taskId: details.task.id, action: "finish" });
@@ -199,6 +202,7 @@ export function Tasks({
                   {projectName(data, task.projectId)} · {pretty(task.source)}
                 </small>
               </div>
+              <div className="task-row-actions">
               <Badge
                 text={
                   data.runs.some((run) => run.taskId === task.id && run.status === "completed") &&
@@ -207,14 +211,6 @@ export function Tasks({
                     : pretty(task.status)
                 }
               />
-              {scope === "archived" && (
-                <button
-                  className="small-button"
-                  onClick={() => void act(task.id, "restore")}
-                >
-                  Restore
-                </button>
-              )}
               <button
                 className="small-button"
                 onClick={() => void openTask(task.id)}
@@ -243,6 +239,7 @@ export function Tasks({
               {task.status === "captured" && (
                 <button
                   className="small-button"
+                  title="Confirm this was assigned to you, without claiming it as active work yet"
                   onClick={() => void act(task.id, "confirm")}
                 >
                   Confirm
@@ -251,6 +248,7 @@ export function Tasks({
               {task.status === "captured" && (
                 <button
                   className="small-button"
+                  title="Remove this task from the inbox; it is not deleted and can be reviewed in history"
                   onClick={() => void act(task.id, "reject")}
                 >
                   Reject
@@ -259,6 +257,7 @@ export function Tasks({
               {(task.status === "captured" || task.status === "assigned") && (
                 <button
                   className="small-button"
+                  title="Claim this as active work and move it to planning"
                   onClick={() => void act(task.id, "claim")}
                 >
                   Claim
@@ -323,41 +322,49 @@ export function Tasks({
                   Finish locally
                 </button>
               )}
-              {scope === "active" && (
+              <OverflowMenu label={`More actions for ${task.title}`}>
+                {scope === "archived" && (
+                  <button onClick={() => void act(task.id, "restore")}>
+                    Restore
+                  </button>
+                )}
+                {scope === "active" && (
+                  <button
+                    disabled={["in_progress", "sync_pending"].includes(
+                      task.status,
+                    )}
+                    title={
+                      ["in_progress", "sync_pending"].includes(task.status)
+                        ? "Pause or finish active work before archiving"
+                        : "Move this task to the archive"
+                    }
+                    onClick={() => void act(task.id, "archive")}
+                  >
+                    Archive
+                  </button>
+                )}
                 <button
-                  className="small-button"
-                  disabled={["in_progress", "sync_pending"].includes(
-                    task.status,
-                  )}
+                  className="danger"
+                  disabled={["in_progress", "sync_pending"].includes(task.status)}
                   title={
                     ["in_progress", "sync_pending"].includes(task.status)
-                      ? "Pause or finish active work before archiving"
-                      : "Move this task to the archive"
+                      ? "Pause or finish active work before deleting"
+                      : "Remove this task from AwenesOS"
                   }
-                  onClick={() => void act(task.id, "archive")}
-                >
-                  Archive
-                </button>
-              )}
-              <button
-                className="small-button danger"
-                disabled={["in_progress", "sync_pending"].includes(task.status)}
-                title={
-                  ["in_progress", "sync_pending"].includes(task.status)
-                    ? "Pause or finish active work before deleting"
-                    : "Remove this task from AwenesOS"
-                }
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "Remove this task from AwenesOS? Its audit tombstone will be retained.",
+                  onClick={async () => {
+                    if (
+                      await confirm(
+                        "Remove this task from AwenesOS? Its audit tombstone will be retained.",
+                        "Delete",
+                      )
                     )
-                  )
-                    void act(task.id, "delete");
-                }}
-              >
-                Delete
-              </button>
+                      void act(task.id, "delete");
+                  }}
+                >
+                  Delete
+                </button>
+              </OverflowMenu>
+              </div>
             </div>
           ))
         ) : (

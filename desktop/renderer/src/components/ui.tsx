@@ -1,5 +1,5 @@
 import type { Dispatch, ReactNode, SetStateAction } from "react";
-import { pretty } from "../utils/presentation.js";
+import { badgeTone, pretty } from "../utils/presentation.js";
 import { StatusIcon } from "./status-icon.js";
 
 export function Pagination({ page, setPage, pageSize, total, totalPages, label }: {
@@ -37,15 +37,7 @@ export function Panel({ title, children, action, onAction }: { title: string; ch
 }
 
 export function Badge({ text }: { text: string }) {
-  const value = text.toLowerCase();
-  const tone = value.includes("fail") || value.includes("reject")
-    ? "danger"
-    : value.includes("complete") || value.includes("ready") || value.includes("verified")
-      ? "success"
-      : value.includes("pause") || value.includes("pending") || value.includes("approval")
-        ? "warning"
-        : "neutral";
-  return <span className={`badge ${tone}`}>{text}</span>;
+  return <span className={`badge ${badgeTone(text)}`}>{text}</span>;
 }
 
 export function Empty({ title, copy }: { title: string; copy: string }) {
